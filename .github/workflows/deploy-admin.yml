@@ -1,0 +1,28 @@
+name: Deploy Admin Moneyfy
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_KEY }}
+
+      - name: Deploy to Admin
+        run: |
+          ssh -p 42877 -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_SERVER }} << 'EOF'
+            cd /var/www/admin/
+            git pull origin master
+            # Si tienes assets estáticos adicionales, puedes agregarlos aquí
+            sudo systemctl restart nginx
+          EOF
