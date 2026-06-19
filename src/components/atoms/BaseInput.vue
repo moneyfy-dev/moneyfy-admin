@@ -18,9 +18,17 @@ defineProps({
     type: String,
     default: '',
   },
+  trailingIcon: {
+    type: String,
+    default: '',
+  },
+  trailingLabel: {
+    type: String,
+    default: '',
+  },
 })
 
-defineEmits(['update:modelValue'])
+defineEmits(['update:modelValue', 'trailing-click'])
 </script>
 
 <template>
@@ -37,9 +45,23 @@ defineEmits(['update:modelValue'])
       <input
         v-bind="$attrs"
         :value="modelValue"
-        :class="['field', icon && 'pl-10', error && '!border-red-500 !ring-red-100']"
+        :class="[
+          'field',
+          icon && 'pl-10',
+          trailingIcon && 'pr-10',
+          error && '!border-red-500 !ring-red-100',
+        ]"
         @input="$emit('update:modelValue', $event.target.value)"
       />
+      <button
+        v-if="trailingIcon"
+        type="button"
+        class="absolute inset-y-0 right-0 inline-flex w-10 items-center justify-center text-slate-400 transition hover:text-moneyfy-700"
+        :aria-label="trailingLabel || 'Accion de campo'"
+        @click="$emit('trailing-click')"
+      >
+        <i :class="[trailingIcon, 'text-lg']" aria-hidden="true"></i>
+      </button>
     </span>
     <span v-if="error" class="mt-1 block text-xs font-medium text-red-700">{{ error }}</span>
   </label>

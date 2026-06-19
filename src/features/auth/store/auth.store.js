@@ -38,7 +38,10 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = session.user
       return session.user
     } catch (signInError) {
-      error.value = signInError.message || 'No fue posible iniciar sesión.'
+      error.value =
+        signInError.code === 'NETWORK_ERROR'
+          ? 'No fue posible conectar con el servidor. El backend esta rechazando CORS para https://admin.moneyfy.cl.'
+          : signInError.message || 'No fue posible iniciar sesion.'
       throw signInError
     } finally {
       loading.value = false
@@ -53,7 +56,7 @@ export const useAuthStore = defineStore('auth', () => {
       const result = await authRepository.recoverPassword(email)
       recoveryMessage.value = result.message
     } catch (recoveryError) {
-      error.value = recoveryError.message || 'No fue posible solicitar la recuperación.'
+      error.value = recoveryError.message || 'No fue posible solicitar la recuperacion.'
     } finally {
       loading.value = false
     }

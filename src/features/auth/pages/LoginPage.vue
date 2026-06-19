@@ -1,5 +1,5 @@
 <script setup>
-import { reactive } from 'vue'
+import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BaseButton from '@/components/atoms/BaseButton.vue'
 import BaseInput from '@/components/atoms/BaseInput.vue'
@@ -14,6 +14,8 @@ const form = reactive({
   email: 'alejandro.osses.r@gmail.com',
   password: '',
 })
+
+const showPassword = ref(false)
 
 async function submit() {
   authStore.clearFeedback()
@@ -46,7 +48,7 @@ function recoverPassword() {
           </h1>
           <p class="mt-5 max-w-lg text-base leading-7 text-white/70">
             Visualiza comisiones, revisa estados de pago y administra los archivos de
-            actualización de la operación.
+            actualizacion de la operacion.
           </p>
           <div class="mt-10 grid gap-3 sm:grid-cols-3">
             <div
@@ -69,7 +71,7 @@ function recoverPassword() {
         <div class="admin-card w-full max-w-md p-8">
           <div class="mb-7">
             <p class="text-xs font-semibold text-moneyfy-700">Moneyfy Admin</p>
-            <h2 class="mt-2 text-2xl font-bold">Iniciar sesión</h2>
+            <h2 class="mt-2 text-2xl font-bold">Iniciar sesion</h2>
             <p class="mt-2 text-xs text-slate-500">Acceso inicial habilitado para Alejandro.</p>
           </div>
 
@@ -82,10 +84,13 @@ function recoverPassword() {
             />
             <BaseInput
               v-model="form.password"
-              label="Contraseña"
-              type="password"
+              label="Contrasena"
+              :type="showPassword ? 'text' : 'password'"
               autocomplete="current-password"
-              placeholder="Ingresa tu contraseña"
+              placeholder="Ingresa tu contrasena"
+              :trailing-icon="showPassword ? 'ri-eye-off-line' : 'ri-eye-line'"
+              :trailing-label="showPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'"
+              @trailing-click="showPassword = !showPassword"
             />
             <p
               v-if="authStore.error"
@@ -111,7 +116,7 @@ function recoverPassword() {
               type="button"
               @click="recoverPassword"
             >
-              <span>Olvidé o necesito recordar mi contraseña</span>
+              <span>Olvide o necesito recordar mi contrasena</span>
               <i class="ri-key-2-line text-lg text-moneyfy-600"></i>
             </button>
             <p
