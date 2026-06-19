@@ -113,7 +113,7 @@ function collectPaymentGroups(sourceItems) {
         transactionCount: 0,
         cotizaciones: [],
         selectedAccount: commission.selectedAccount || null,
-        voucher: `PAY-${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}-${commission.userId.slice(-6).toUpperCase()}`,
+        voucher: `PAY-${new Date().toISOString().slice(0, 19).replaceAll('-', '').replaceAll(':', '').replace('T', '')}-${commission.userId.slice(-6).toUpperCase()}`,
       })
     }
 
