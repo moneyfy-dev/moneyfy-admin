@@ -3,7 +3,7 @@ import { apiClient } from '@/services/api/client'
 export const apiAuthRepository = {
   async signIn(credentials) {
     const response = await apiClient.post(
-      '/auth/log-in',
+      '/manager/auth/log-in',
       {
         email: credentials.email,
         pwd: credentials.password,
