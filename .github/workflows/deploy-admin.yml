@@ -23,6 +23,11 @@ jobs:
           ssh -p 42877 -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_SERVER }} << 'EOF'
             cd /var/www/admin/
             git pull origin master
-            # Si tienes assets estáticos adicionales, puedes agregarlos aquí
+
+            # Instalar dependencias y compilar assets
+            npm install --production
+            npm run build
+
+            # Reiniciar Nginx para servir los nuevos archivos
             sudo systemctl restart nginx
           EOF
