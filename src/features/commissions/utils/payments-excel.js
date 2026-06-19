@@ -275,8 +275,8 @@ function buildPayloadRow(rowData) {
     userAccount: account,
     userPayment: rowData.amount,
     userVoucher: rowData.voucherBanco || null,
-    paymentStatus: rowData.status,
-    paymentNote: rowData.note || null,
+    userTransactionStatus: rowData.status,
+    userNote: rowData.note || null,
   }
 }
 
@@ -402,14 +402,7 @@ export async function parsePaymentPayrollExcel(file) {
     conflictRows,
     rejected,
     payload: {
-      usersQuotes: paidRows.map((row) => ({
-        userId: row.userId,
-        transactions: row.transactions,
-        userAccount: row.userAccount,
-        userPayment: row.amount,
-        userVoucher: row.voucherBanco || null,
-      })),
-      bankResponses: validRows.map(buildPayloadRow),
+      usersQuotes: validRows.map(buildPayloadRow),
     },
   }
 }

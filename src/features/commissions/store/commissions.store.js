@@ -36,6 +36,8 @@ function buildPayQuotesPayload(groups) {
   return {
     usersQuotes: groups.map((group) => ({
       userId: group.userId,
+      userTransactionStatus: 'Pagado',
+      userNote: group.note || '',
       transactions: group.transactionIds,
       userAccount: group.selectedAccount,
       userPayment: group.totalComision,
@@ -56,6 +58,7 @@ function mapImportedPaymentRow(row) {
     selectedAccount: row.userAccount,
     voucher: row.voucherBanco || '',
     note: row.note || '',
+    status: row.status || 'Pagado',
     accountDataAvailable: hasCompletePaymentAccount(row.userAccount),
     accountStatus: hasCompletePaymentAccount(row.userAccount)
       ? 'Cuenta cargada desde Excel'
@@ -275,6 +278,7 @@ function buildPaymentPreviewFromReport(report, sourceItems) {
         })),
         selectedAccount,
         voucher: group.userVoucher || '',
+        note: group.userNote || '',
         accountDataAvailable: hasCompletePaymentAccount(selectedAccount),
         accountStatus: hasCompletePaymentAccount(selectedAccount)
           ? 'Cuenta lista'
@@ -631,22 +635,30 @@ export const useCommissionsStore = defineStore('commissions', () => {
       )
 
       let paidCount = 0
+      let conflictCount = 0
 
       if (submitted) {
-        prepared.forEach((group) => {
+        const successfulGroups = [...prepared, ...conflicts]
+
+        successfulGroups.forEach((group) => {
           const groupKey = `${group.userId}::${group.transactionIds.slice().sort().join('|')}`
           if (failedGroups.has(groupKey)) {
             return
           }
 
-      items.value.forEach((commission) => {
+          items.value.forEach((commission) => {
             if (commission.userId !== group.userId) return
             if (!group.transactionIds.includes(commission.transactionId)) return
 
-            commission.estado = DISPLAY_STATUS_BY_BACKEND_STATUS.Pagado
-            commission.estadoBackend = 'Pagado'
+            const backendStatus = group.status === 'Conflictivo' ? 'Conflictivo' : 'Pagado'
+            commission.estado = backendStatus === 'Conflictivo' ? 'Rechazado' : DISPLAY_STATUS_BY_BACKEND_STATUS.Pagado
+            commission.estadoBackend = backendStatus
             commission.paymentDate = new Date().toISOString().slice(0, 10)
-            paidCount += 1
+            if (backendStatus === 'Conflictivo') {
+              conflictCount += 1
+            } else {
+              paidCount += 1
+            }
           })
         })
       }
@@ -655,7 +667,7 @@ export const useCommissionsStore = defineStore('commissions', () => {
         totalVisible,
         prepared: prepared.length,
         paid: paidCount,
-        conflicts: conflicts.length,
+        conflicts: conflictCount || conflicts.length,
         rejected: rejected.length,
         failed: failedPayments.length,
         submitted,
