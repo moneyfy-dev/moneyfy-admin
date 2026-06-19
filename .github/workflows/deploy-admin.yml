@@ -21,11 +21,14 @@ jobs:
       - name: Deploy to Admin
         run: |
           ssh -p 42877 -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_SERVER }} << 'EOF'
+            set -e
             cd /var/www/admin/
+            git config --global --add safe.directory /var/www/admin
             git pull origin master
 
             # Instalar dependencias y compilar assets
             npm ci
+            export NODE_OPTIONS=--max-old-space-size=2048
             npm run build
 
             # Reiniciar Nginx para servir los nuevos archivos
