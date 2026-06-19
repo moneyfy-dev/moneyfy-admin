@@ -25,7 +25,7 @@ jobs:
             git pull origin master
 
             # Instalar dependencias y compilar assets
-            npm install --production
+            npm ci
             npm run build
 
             # Reiniciar Nginx para servir los nuevos archivos
