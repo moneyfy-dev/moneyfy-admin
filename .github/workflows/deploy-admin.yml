@@ -20,8 +20,13 @@ jobs:
 
       - name: Deploy to Admin
         run: |
-          ssh -p 42877 -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_SERVER }} << 'EOF'
-            set -e
+          ssh -tt -p 42877 \
+            -o StrictHostKeyChecking=no \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=6 \
+            -o TCPKeepAlive=yes \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_SERVER }} << 'EOF'
+            set -euo pipefail
             cd /var/www/admin/
             git config --global --add safe.directory /var/www/admin
             git pull origin master
@@ -32,5 +37,5 @@ jobs:
             npm run build
 
             # Reiniciar Nginx para servir los nuevos archivos
-            sudo systemctl restart nginx
+            sudo -n systemctl restart nginx
           EOF
