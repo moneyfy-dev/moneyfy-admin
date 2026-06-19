@@ -8,11 +8,11 @@
         <div>
           <h2 class="text-lg font-bold">Administración de usuarios</h2>
           <p class="mt-2 max-w-2xl text-xs leading-6 text-slate-500">
-            Este segmento está preparado como feature independiente. El CRUD se conectará
-            cuando el backend defina endpoints, roles, permisos y paginación.
+            Este modulo no sera desarrollado en esta etapa. La administracion de usuarios queda fuera del alcance definido para Moneyfy Admin.
           </p>
         </div>
       </div>
     </section>
   </div>
 </template>
+

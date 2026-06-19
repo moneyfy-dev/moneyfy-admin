@@ -181,7 +181,7 @@ async function importPaymentFile(event) {
             class="rounded-[8px] bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800"
             role="status"
           >
-            Hay {{ commissionsStore.paymentPreparation.missingAccountCount }} usuarios con comisiones aprobadas sin cuenta bancaria expuesta en el dashboard. Puedes exportar la nomina, pero el pago automatico queda bloqueado hasta que backend entregue la cuenta seleccionada o la resuelva server-side.
+            Hay {{ commissionsStore.paymentPreparation.missingAccountCount }} usuarios con comisiones aprobadas sin cuenta bancaria completa en los datos actuales. Puedes exportar la nomina, pero el procesamiento automatico de pagos seguira bloqueado hasta que backend exponga la cuenta seleccionada o ese dato se resuelva en el flujo server-side.
           </p>
 
           <p
@@ -277,3 +277,4 @@ async function importPaymentFile(event) {
     />
   </div>
 </template>
+
