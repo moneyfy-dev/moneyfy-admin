@@ -5,27 +5,26 @@ import { tokenStorage } from '@/services/api/token-storage'
 import { setUnauthorizedHandler } from '@/services/api/client'
 
 export const useAuthStore = defineStore('auth', () => {
-  const user = ref(null)
+  const user = ref(tokenStorage.getUser())
   const loading = ref(false)
   const initialized = ref(false)
   const error = ref('')
   const recoveryMessage = ref('')
 
-  const isAuthenticated = computed(() => Boolean(user.value))
+  const isAuthenticated = computed(() => Boolean(user.value && tokenStorage.hasSession()))
 
   async function initialize() {
     if (initialized.value) return
 
-    try {
-      if (tokenStorage.hasSession()) {
-        user.value = await authRepository.getProfile()
-      }
-    } catch {
+    if (!tokenStorage.hasSession()) {
       tokenStorage.clear()
       user.value = null
-    } finally {
       initialized.value = true
+      return
     }
+
+    user.value = tokenStorage.getUser()
+    initialized.value = true
   }
 
   async function signIn(credentials) {
@@ -34,13 +33,15 @@ export const useAuthStore = defineStore('auth', () => {
 
     try {
       const session = await authRepository.signIn(credentials)
-      tokenStorage.setAccessToken(session.accessToken)
+      tokenStorage.setSessionToken(session.sessionToken)
+      tokenStorage.setRefreshToken(session.refreshToken)
+      tokenStorage.setUser(session.user)
       user.value = session.user
       return session.user
     } catch (signInError) {
       error.value =
         signInError.code === 'NETWORK_ERROR'
-          ? 'No fue posible conectar con el servidor. El backend esta rechazando CORS para https://admin.moneyfy.cl.'
+          ? 'No fue posible conectar con el servidor.'
           : signInError.message || 'No fue posible iniciar sesion.'
       throw signInError
     } finally {
@@ -51,10 +52,11 @@ export const useAuthStore = defineStore('auth', () => {
   async function recoverPassword(email) {
     loading.value = true
     recoveryMessage.value = ''
+    error.value = ''
 
     try {
       const result = await authRepository.recoverPassword(email)
-      recoveryMessage.value = result.message
+      recoveryMessage.value = result.message || 'Solicitud enviada correctamente.'
     } catch (recoveryError) {
       error.value = recoveryError.message || 'No fue posible solicitar la recuperacion.'
     } finally {

@@ -15,12 +15,13 @@ export const mockAuthRepository = {
     await wait()
 
     if (email.trim().toLowerCase() !== DEMO_ADMIN.email || password !== DEMO_PASSWORD) {
-      throw new Error('Credenciales no válidas para el administrador Moneyfy.')
+      throw new Error('Credenciales no validas para el administrador Moneyfy.')
     }
 
     return {
       user: DEMO_ADMIN,
-      accessToken: 'moneyfy-admin-demo-token',
+      sessionToken: 'moneyfy-admin-demo-session-token',
+      refreshToken: 'moneyfy-admin-demo-refresh-token',
     }
   },
 
@@ -28,13 +29,8 @@ export const mockAuthRepository = {
     await wait()
 
     return {
-      message: `Se enviaría un enlace de recuperación a ${email}.`,
+      message: `Se enviaria un enlace de recuperacion a ${email}.`,
     }
-  },
-
-  async getProfile() {
-    await wait(100)
-    return DEMO_ADMIN
   },
 
   async logout() {

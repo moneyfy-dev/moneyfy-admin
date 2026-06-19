@@ -12,66 +12,58 @@ export const apiClient = axios.create({
   },
 })
 
-let refreshPromise = null
 let unauthorizedHandler = null
 
 export function setUnauthorizedHandler(handler) {
   unauthorizedHandler = handler
 }
 
-async function refreshAccessToken() {
-  if (!refreshPromise) {
-    refreshPromise = apiClient
-      .post('/auth/refresh', undefined, {
-        withCredentials: true,
-        skipAuthRefresh: true,
-      })
-      .then((response) => {
-        const token = response.data?.data?.accessToken || response.data?.accessToken
-        if (!token) throw new Error('La API no devolvió un access token.')
-        tokenStorage.setAccessToken(token)
-        return token
-      })
-      .finally(() => {
-        refreshPromise = null
-      })
+function applyRotatedTokens(response) {
+  const nextSessionToken = response?.headers?.['x-new-session-token']
+  const nextRefreshToken = response?.headers?.['x-new-refresh-token']
+
+  if (nextSessionToken) {
+    tokenStorage.setSessionToken(nextSessionToken)
   }
 
-  return refreshPromise
+  if (nextRefreshToken) {
+    tokenStorage.setRefreshToken(nextRefreshToken)
+  }
+
+  return response
 }
 
 apiClient.interceptors.request.use((config) => {
-  const token = tokenStorage.getAccessToken()
+  const sessionToken = tokenStorage.getSessionToken()
+  const refreshToken = tokenStorage.getRefreshToken()
 
-  if (token && !config.skipAuth) {
-    config.headers.Authorization = `Bearer ${token}`
+  if (!config.skipAuth && sessionToken) {
+    config.headers.Authorization = `Bearer ${sessionToken}`
+  }
+
+  if (!config.skipAuth && refreshToken) {
+    config.headers['X-New-Refresh-Token'] = refreshToken
   }
 
   return config
 })
 
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => applyRotatedTokens(response),
   async (error) => {
-    const request = error.config
-    const canRefresh =
-      error.response?.status === 401 &&
+    applyRotatedTokens(error?.response)
+
+    const status = error?.response?.status
+    const request = error?.config
+    const shouldLogout =
+      (status === 401 || status === 417) &&
       request &&
       !request.skipAuthRefresh &&
-      !request._retry
+      !request.skipAuth
 
-    if (canRefresh) {
-      request._retry = true
-
-      try {
-        const token = await refreshAccessToken()
-        request.headers.Authorization = `Bearer ${token}`
-        return apiClient(request)
-      } catch (refreshError) {
-        tokenStorage.clear()
-        unauthorizedHandler?.()
-        throw normalizeApiError(refreshError)
-      }
+    if (shouldLogout) {
+      tokenStorage.clear()
+      unauthorizedHandler?.()
     }
 
     throw normalizeApiError(error)
