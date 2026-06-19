@@ -13,6 +13,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build admin
+        run: npm run build
+
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.7.0
         with:
@@ -20,7 +32,14 @@ jobs:
 
       - name: Deploy to Admin
         run: |
-          ssh -tt -p 42877 \
+          tar -czf admin-dist.tar.gz dist
+
+          scp -P 42877 \
+            -o StrictHostKeyChecking=no \
+            admin-dist.tar.gz \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_SERVER }}:/tmp/admin-dist.tar.gz
+
+          ssh -p 42877 \
             -o StrictHostKeyChecking=no \
             -o ServerAliveInterval=30 \
             -o ServerAliveCountMax=6 \
@@ -31,10 +50,9 @@ jobs:
             git config --global --add safe.directory /var/www/admin
             git pull origin master
 
-            # Instalar dependencias y compilar assets
-            npm ci
-            export NODE_OPTIONS=--max-old-space-size=2048
-            npm run build
+            rm -rf dist
+            tar -xzf /tmp/admin-dist.tar.gz -C /var/www/admin
+            rm -f /tmp/admin-dist.tar.gz
 
             # Reiniciar Nginx para servir los nuevos archivos
             sudo -n systemctl restart nginx
