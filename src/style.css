@@ -1,0 +1,71 @@
+@font-face {
+  font-family: 'Poppins';
+  src: url('./assets/fonts/poppins-v20-latin-regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  src: url('./assets/fonts/poppins-v20-latin-500.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  src: url('./assets/fonts/poppins-v20-latin-600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  src: url('./assets/fonts/poppins-v20-latin-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background: #f3f6f4;
+    color: #111111;
+    font-family: 'Poppins', system-ui, sans-serif;
+    font-size: 15px;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex h-11 items-center justify-center gap-2 rounded-full bg-moneyfy-600 px-5 text-sm font-semibold text-white shadow-green transition hover:bg-moneyfy-700 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-dark {
+    @apply inline-flex h-11 items-center justify-center gap-2 rounded-full bg-ink px-5 text-sm font-semibold text-white transition hover:bg-black;
+  }
+
+  .btn-ghost {
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-moneyfy-600 hover:text-moneyfy-700;
+  }
+
+  .admin-card {
+    @apply rounded-[8px] border border-slate-200 bg-white shadow-soft;
+  }
+
+  .field {
+    @apply h-11 w-full rounded-[8px] border border-slate-200 bg-white px-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-moneyfy-600 focus:ring-4 focus:ring-moneyfy-100;
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "moneyfy-admin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "axios": "^1.17.0",
+    "chart.js": "^4.5.1",
+    "exceljs": "^4.4.0",
+    "pinia": "^3.0.4",
+    "remixicon": "^4.5.0",
+    "vite": "^6.0.7",
+    "vue": "^3.5.13",
+    "vue-chartjs": "^5.3.3",
+    "vue-router": "^4.6.4"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17"
+  }
+}
