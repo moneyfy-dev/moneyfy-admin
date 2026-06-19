@@ -1,0 +1,163 @@
+<script setup>
+import { computed, onBeforeUnmount, onMounted } from 'vue'
+import BaseButton from '@/components/atoms/BaseButton.vue'
+
+const props = defineProps({
+  preview: {
+    type: Object,
+    required: true,
+  },
+  loading: Boolean,
+})
+
+const emit = defineEmits(['close', 'confirm'])
+
+const preparedPreview = computed(() => props.preview.prepared.slice(0, 8))
+const rejectedPreview = computed(() => props.preview.rejected.slice(0, 8))
+
+function closeOnEscape(event) {
+  if (event.key === 'Escape' && !props.loading) emit('close')
+}
+
+onMounted(() => {
+  document.body.style.overflow = 'hidden'
+  window.addEventListener('keydown', closeOnEscape)
+})
+
+onBeforeUnmount(() => {
+  document.body.style.overflow = ''
+  window.removeEventListener('keydown', closeOnEscape)
+})
+</script>
+
+<template>
+  <Teleport to="body">
+    <div
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      role="presentation"
+      @mousedown.self="!loading && $emit('close')"
+    >
+      <section
+        class="max-h-[calc(100vh-2rem)] w-full max-w-4xl overflow-y-auto rounded-[8px] bg-white shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="commission-import-review-title"
+      >
+        <header class="flex items-start justify-between gap-4 bg-ink px-5 py-5 text-white sm:px-7">
+          <div class="flex min-w-0 items-center gap-3">
+            <span
+              class="flex size-11 shrink-0 items-center justify-center rounded-[8px] bg-white/10 text-2xl text-moneyfy-500"
+            >
+              <i class="ri-file-upload-line" aria-hidden="true"></i>
+            </span>
+            <div class="min-w-0">
+              <p class="text-xs font-semibold uppercase text-moneyfy-500">Revision previa</p>
+              <h2 id="commission-import-review-title" class="truncate text-lg font-bold">
+                Confirmar actualizacion masiva
+              </h2>
+            </div>
+          </div>
+
+          <button
+            class="flex size-10 shrink-0 items-center justify-center rounded-full text-xl text-white/70 transition hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-50"
+            type="button"
+            aria-label="Cerrar revision"
+            :disabled="loading"
+            @click="$emit('close')"
+          >
+            <i class="ri-close-line" aria-hidden="true"></i>
+          </button>
+        </header>
+
+        <div class="space-y-6 p-5 sm:p-7">
+          <div class="grid gap-3 sm:grid-cols-3">
+            <div class="rounded-[8px] border border-slate-200 p-4">
+              <p class="text-xs font-semibold uppercase text-slate-500">Filas procesadas</p>
+              <p class="mt-2 text-2xl font-bold text-ink">{{ preview.total }}</p>
+            </div>
+            <div class="rounded-[8px] border border-moneyfy-100 bg-moneyfy-50 p-4">
+              <p class="text-xs font-semibold uppercase text-moneyfy-700">Listas para enviar</p>
+              <p class="mt-2 text-2xl font-bold text-ink">{{ preview.prepared.length }}</p>
+            </div>
+            <div class="rounded-[8px] border border-amber-100 bg-amber-50 p-4">
+              <p class="text-xs font-semibold uppercase text-amber-700">Rechazadas</p>
+              <p class="mt-2 text-2xl font-bold text-ink">{{ preview.rejected.length }}</p>
+            </div>
+          </div>
+
+          <div v-if="preview.prepared.length > 0" class="space-y-3">
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="font-bold text-ink">Filas que se enviaran</h3>
+              <p class="text-xs text-slate-500">
+                Mostrando {{ preparedPreview.length }} de {{ preview.prepared.length }}
+              </p>
+            </div>
+            <div class="overflow-hidden rounded-[8px] border border-slate-200">
+              <table class="min-w-full divide-y divide-slate-200 text-left text-xs">
+                <thead class="bg-slate-50 text-slate-500">
+                  <tr>
+                    <th class="px-3 py-2 font-semibold">Fila</th>
+                    <th class="px-3 py-2 font-semibold">ID cotizacion</th>
+                    <th class="px-3 py-2 font-semibold">Cliente</th>
+                    <th class="px-3 py-2 font-semibold">Compania</th>
+                    <th class="px-3 py-2 font-semibold">Estado actual</th>
+                    <th class="px-3 py-2 font-semibold">Nuevo estado</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  <tr v-for="row in preparedPreview" :key="`${row.rowNumber}-${row.idCotizacion}`">
+                    <td class="px-3 py-2 text-slate-500">{{ row.rowNumber }}</td>
+                    <td class="px-3 py-2 font-medium text-ink">{{ row.idCotizacion }}</td>
+                    <td class="px-3 py-2 text-slate-700">{{ row.nombre }}</td>
+                    <td class="px-3 py-2 text-slate-700">{{ row.compania || 'No disponible' }}</td>
+                    <td class="px-3 py-2 text-slate-700">{{ row.estadoActual }}</td>
+                    <td class="px-3 py-2 font-semibold text-moneyfy-700">{{ row.estado }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div v-if="preview.rejected.length > 0" class="space-y-3">
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="font-bold text-ink">Filas rechazadas</h3>
+              <p class="text-xs text-slate-500">
+                Mostrando {{ rejectedPreview.length }} de {{ preview.rejected.length }}
+              </p>
+            </div>
+            <div class="overflow-hidden rounded-[8px] border border-red-100 bg-red-50">
+              <table class="min-w-full divide-y divide-red-100 text-left text-xs">
+                <thead class="bg-red-100/70 text-red-700">
+                  <tr>
+                    <th class="px-3 py-2 font-semibold">Fila</th>
+                    <th class="px-3 py-2 font-semibold">Motivo</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-red-100/80">
+                  <tr v-for="row in rejectedPreview" :key="`${row.rowNumber}-${row.reason}`">
+                    <td class="px-3 py-2 font-medium text-red-700">{{ row.rowNumber }}</td>
+                    <td class="px-3 py-2 text-red-700">{{ row.reason }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="flex justify-end gap-3 border-t border-slate-100 pt-5">
+            <BaseButton variant="ghost" :disabled="loading" @click="$emit('close')">
+              Cancelar
+            </BaseButton>
+            <BaseButton
+              variant="dark"
+              :loading="loading"
+              :disabled="preview.prepared.length === 0"
+              @click="$emit('confirm')"
+            >
+              Confirmar envio
+            </BaseButton>
+          </div>
+        </div>
+      </section>
+    </div>
+  </Teleport>
+</template>
