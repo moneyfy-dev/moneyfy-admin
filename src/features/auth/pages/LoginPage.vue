@@ -72,7 +72,7 @@ function recoverPassword() {
           <div class="mb-7">
             <p class="text-xs font-semibold text-moneyfy-700">Moneyfy Admin</p>
             <h2 class="mt-2 text-2xl font-bold">Iniciar sesion</h2>
-            <p class="mt-2 text-xs text-slate-500">Acceso inicial habilitado para Alejandro.</p>
+            <p class="mt-2 text-xs text-slate-500">Acceso administradores de Moneyfy</p>
           </div>
 
           <form class="space-y-4" @submit.prevent="submit">
@@ -92,13 +92,21 @@ function recoverPassword() {
               :trailing-label="showPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'"
               @trailing-click="showPassword = !showPassword"
             />
-            <p
+            <div
               v-if="authStore.error"
-              class="rounded-[8px] bg-red-50 px-3 py-2 text-xs text-red-700"
+              class="flex items-start justify-between gap-3 rounded-[8px] bg-red-50 px-3 py-2 text-xs text-red-700"
               role="alert"
             >
-              {{ authStore.error }}
-            </p>
+              <span class="leading-5">{{ authStore.error }}</span>
+              <button
+                class="shrink-0 text-sm leading-none text-red-500 transition hover:text-red-700"
+                type="button"
+                aria-label="Cerrar mensaje"
+                @click="authStore.clearFeedback()"
+              >
+                <i class="ri-close-line"></i>
+              </button>
+            </div>
             <BaseButton
               class="w-full"
               type="submit"
@@ -132,3 +140,4 @@ function recoverPassword() {
     </div>
   </main>
 </template>
+
