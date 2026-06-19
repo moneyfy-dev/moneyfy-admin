@@ -23,6 +23,13 @@ jobs:
         run: npm ci
 
       - name: Build admin
+        env:
+          VITE_API_URL: https://api.moneyfy.cl/moneyfy
+          VITE_USE_MOCKS: "false"
+          VITE_DASHBOARD_USE_MOCKS: "false"
+          VITE_COMMISSIONS_USE_MOCKS: "false"
+          VITE_STATUS_UPDATES_ENABLED: "true"
+          VITE_MONEYFY_API_KEY: ${{ secrets.MONEYFY_API_KEY }}
         run: npm run build
 
       - name: Setup SSH

@@ -6,7 +6,7 @@ const parseBoolean = (value, fallback) => {
 const useMocks = parseBoolean(import.meta.env.VITE_USE_MOCKS, false)
 
 export const runtimeConfig = Object.freeze({
-  apiUrl: import.meta.env.VITE_API_URL || '',
+  apiUrl: import.meta.env.VITE_API_URL || 'https://api.moneyfy.cl/moneyfy',
   useMocks,
   commissionsUseMocks: parseBoolean(
     import.meta.env.VITE_COMMISSIONS_USE_MOCKS,
