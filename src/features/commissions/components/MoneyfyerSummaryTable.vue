@@ -29,6 +29,18 @@ function statusClass(statusLabel) {
     return 'bg-amber-50 text-amber-800'
   }
 
+  if (statusLabel === 'Conflictivo') {
+    return 'bg-orange-50 text-orange-700'
+  }
+
+  if (statusLabel === 'Falta cuenta bancaria') {
+    return 'bg-amber-50 text-amber-800'
+  }
+
+  if (statusLabel === 'Sin comisiones aprobadas') {
+    return 'bg-slate-100 text-slate-600'
+  }
+
   return 'bg-rose-50 text-rose-700'
 }
 </script>

@@ -17,7 +17,6 @@ export const runtimeConfig = Object.freeze({
     useMocks,
   ),
   requestTimeout: Number(import.meta.env.VITE_API_TIMEOUT || 15000),
-  managerApiKey: import.meta.env.VITE_MONEYFY_API_KEY || '',
   managerPageSize: Number(import.meta.env.VITE_MANAGER_PAGE_SIZE || 100),
   statusUpdatesEnabled: parseBoolean(import.meta.env.VITE_STATUS_UPDATES_ENABLED, false),
 })

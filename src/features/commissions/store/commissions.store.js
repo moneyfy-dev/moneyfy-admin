@@ -6,6 +6,7 @@ import { toInputDate } from '../utils/commission-formatters'
 const DISPLAY_STATUS_BY_BACKEND_STATUS = Object.freeze({
   Aprobado: 'Pendiente de pago',
   Pagado: 'Pagado',
+  Conflictivo: 'Conflictivo',
   Rechazado: 'Rechazado',
   Caducado: 'Caducado',
 })
@@ -76,6 +77,22 @@ function hasCompletePaymentAccount(account) {
     account.accountType &&
     account.accountNumber,
   )
+}
+
+function getMutationErrorMessage(requestError, fallbackMessage) {
+  if (requestError.status === 403) {
+    return 'La cuenta autenticada no tiene permisos para completar esta accion.'
+  }
+
+  if (requestError.status === 401 || requestError.status === 417) {
+    return 'La sesion administrativa expiro o ya no es valida. Ingresa nuevamente.'
+  }
+
+  if (requestError.code === 'NETWORK_ERROR') {
+    return 'El navegador no pudo conectar con el endpoint administrativo. Revisa CORS, URL base o disponibilidad del backend.'
+  }
+
+  return requestError.message || fallbackMessage
 }
 
 function collectPaymentGroups(sourceItems) {
@@ -184,6 +201,7 @@ function collectMoneyfyerRows(sourceItems) {
         quoteIds: new Set(),
         pendingApprovalAmount: 0,
         pendingPaymentAmount: 0,
+        conflictiveAmount: 0,
         paidAmount: 0,
       })
     }
@@ -202,6 +220,11 @@ function collectMoneyfyerRows(sourceItems) {
       return
     }
 
+    if (commission.estadoBackend === 'Conflictivo') {
+      row.conflictiveAmount += amount
+      return
+    }
+
     if (commission.estadoBackend === 'Aprobado') {
       row.pendingPaymentAmount += amount
       return
@@ -215,7 +238,8 @@ function collectMoneyfyerRows(sourceItems) {
   return Array.from(grouped.values())
     .map((row) => {
       const accountDataAvailable = hasCompletePaymentAccount(row.selectedAccount)
-      const totalGeneratedAmount = row.pendingPaymentAmount + row.paidAmount
+      const totalGeneratedAmount =
+        row.pendingPaymentAmount + row.paidAmount + row.conflictiveAmount
       let statusLabel = 'Sin comisiones aprobadas'
 
       if (row.pendingPaymentAmount > 0 && !accountDataAvailable) {
@@ -224,6 +248,8 @@ function collectMoneyfyerRows(sourceItems) {
         statusLabel = 'Listo para nómina'
       } else if (row.pendingApprovalAmount > 0) {
         statusLabel = 'Pendiente de aprobación'
+      } else if (row.conflictiveAmount > 0) {
+        statusLabel = 'Conflictivo'
       } else if (row.paidAmount > 0) {
         statusLabel = 'Pagado'
       }
@@ -239,8 +265,25 @@ function collectMoneyfyerRows(sourceItems) {
     .sort((first, second) => first.nombre.localeCompare(second.nombre, 'es'))
 }
 
+function getSubmittablePaymentGroups(preview) {
+  return [
+    ...(Array.isArray(preview?.prepared) ? preview.prepared : []),
+    ...(Array.isArray(preview?.conflicts) ? preview.conflicts : []),
+  ].filter(
+    (group) =>
+      Array.isArray(group.transactionIds) &&
+      group.transactionIds.length > 0 &&
+      group.accountDataAvailable !== false,
+  )
+}
+
 function buildPaymentPreviewFromReport(report, sourceItems) {
   const approvedItems = sourceItems.filter((item) => item.estadoBackend === 'Aprobado')
+  const visibleTransactionIds = new Set(
+    approvedItems
+      .map((item) => item.transactionId)
+      .filter(Boolean),
+  )
   const approvedByUser = approvedItems.reduce((map, item) => {
     if (!map.has(item.userId)) {
       map.set(item.userId, [])
@@ -254,20 +297,30 @@ function buildPaymentPreviewFromReport(report, sourceItems) {
   const backendPayload = Array.isArray(report.backendPayload) ? report.backendPayload : []
   const conflicts = Array.isArray(report.conflicts) ? report.conflicts : []
 
-  const prepared = backendPayload
+  const groupedRows = backendPayload
     .map((group) => {
       const userRows = approvedByUser.get(group.userId) || []
       const payroll = payrollByUser.get(group.userId)
       const selectedAccount = group.userAccount || payroll?.userAccount || null
-      const transactionIds = Array.isArray(group.transactions) ? [...group.transactions] : []
+      const transactionIds = Array.isArray(group.transactions)
+        ? group.transactions.filter((transactionId) => visibleTransactionIds.has(transactionId))
+        : []
       const matchingQuotes = userRows.filter((item) => transactionIds.includes(item.transactionId))
       const fallbackRow = userRows[0]
+      const status = group.userTransactionStatus === 'Conflictivo' ? 'Conflictivo' : 'Pagado'
+
+      if (transactionIds.length === 0) {
+        return null
+      }
 
       return {
         userId: group.userId,
         nombre: fallbackRow?.nombre || 'No disponible',
         email: fallbackRow?.userEmail || selectedAccount?.email || '',
-        totalComision: Number(group.userPayment || payroll?.totalPayment || 0),
+        totalComision:
+          matchingQuotes.length > 0
+            ? matchingQuotes.reduce((sum, item) => sum + Number(item.totalComision || 0), 0)
+            : Number(group.userPayment || payroll?.totalPayment || 0),
         transactionIds,
         transactionCount: transactionIds.length,
         cotizaciones: matchingQuotes.map((item) => ({
@@ -279,31 +332,55 @@ function buildPaymentPreviewFromReport(report, sourceItems) {
         selectedAccount,
         voucher: group.userVoucher || '',
         note: group.userNote || '',
+        status,
         accountDataAvailable: hasCompletePaymentAccount(selectedAccount),
         accountStatus: hasCompletePaymentAccount(selectedAccount)
           ? 'Cuenta lista'
           : 'Cuenta no disponible en reporte',
       }
     })
+    .filter(Boolean)
     .sort((first, second) => first.nombre.localeCompare(second.nombre, 'es'))
 
-  const rejected = conflicts.map((conflict) => ({
-    idCotizacion: conflict.userId || 'N/A',
-    reason: `${conflict.userName || 'No disponible'}: ${conflict.message}`,
-  }))
+  const invalidAccountRows = groupedRows.filter((group) => !group.accountDataAvailable)
+  const actionableRows = groupedRows.filter((group) => group.accountDataAvailable)
+  const prepared = actionableRows.filter((group) => group.status !== 'Conflictivo')
+  const conflictRows = actionableRows.filter((group) => group.status === 'Conflictivo')
 
-  const missingAccountCount = conflicts.filter((item) =>
-    String(item.message || '').toLowerCase().includes('cuenta bancaria'),
-  ).length
+  const rejected = [
+    ...invalidAccountRows.map((group) => ({
+      reference: group.userId || 'N/A',
+      reason: `${group.nombre || 'No disponible'}: el backend no expuso una cuenta bancaria completa para este pago.`,
+    })),
+    ...conflicts.map((conflict) => ({
+      reference: conflict.userId || 'N/A',
+      reason: `${conflict.userName || 'No disponible'}: ${conflict.message}`,
+    })),
+  ]
+
+  const missingAccountCount =
+    invalidAccountRows.length +
+    conflicts.filter((item) =>
+      String(item.message || '').toLowerCase().includes('cuenta bancaria'),
+    ).length
 
   return {
     totalVisible: approvedItems.length,
     prepared,
+    conflicts: conflictRows,
     rejected,
     payload: {
-      usersQuotes: backendPayload,
+      usersQuotes: actionableRows.map((group) => ({
+        userId: group.userId,
+        userTransactionStatus: group.status,
+        userNote: group.note || null,
+        transactions: [...group.transactionIds],
+        userAccount: group.selectedAccount,
+        userPayment: Number(group.totalComision || 0),
+        userVoucher: group.voucher || null,
+      })),
     },
-    accountDataAvailable: prepared.length > 0 && missingAccountCount === 0,
+    accountDataAvailable: actionableRows.length > 0 && missingAccountCount === 0,
     missingAccountCount,
     hasApprovedRows: approvedItems.length > 0,
   }
@@ -466,11 +543,11 @@ export const useCommissionsStore = defineStore('commissions', () => {
       items.value = await commissionsRepository.list()
     } catch (fetchError) {
       if (fetchError.status === 403) {
-        error.value = 'El backend rechazo el endpoint administrativo con estado 403. Debe habilitar la ruta desplegada.'
-      } else if (fetchError.status === 401) {
-        error.value = 'La API key administrativa fue rechazada por el backend.'
+        error.value = 'La cuenta autenticada no tiene permisos para consultar las comisiones.'
+      } else if (fetchError.status === 401 || fetchError.status === 417) {
+        error.value = 'La sesion administrativa expiro o ya no es valida. Ingresa nuevamente.'
       } else if (fetchError.code === 'NETWORK_ERROR') {
-        error.value = 'El navegador no pudo conectar con el endpoint. El backend debe permitir la cabecera X-Moneyfy-Api-Key en CORS.'
+        error.value = 'El navegador no pudo conectar con el endpoint administrativo. Revisa CORS, URL base o disponibilidad del backend.'
       } else {
         error.value = fetchError.message || 'No fue posible cargar las comisiones.'
       }
@@ -595,7 +672,7 @@ export const useCommissionsStore = defineStore('commissions', () => {
 
       pendingImport.value = null
     } catch (importError) {
-      error.value = importError.message || 'No fue posible actualizar las comisiones.'
+      error.value = getMutationErrorMessage(importError, 'No fue posible actualizar las comisiones.')
     } finally {
       loading.value = false
     }
@@ -609,7 +686,7 @@ export const useCommissionsStore = defineStore('commissions', () => {
     try {
       pendingPayment.value = await generatePaymentPreview()
     } catch (paymentError) {
-      error.value = paymentError.message || 'No fue posible preparar el reporte de pagos.'
+      error.value = getMutationErrorMessage(paymentError, 'No fue posible preparar el reporte de pagos.')
     } finally {
       loading.value = false
     }
@@ -624,21 +701,30 @@ export const useCommissionsStore = defineStore('commissions', () => {
     try {
       const { prepared, rejected, totalVisible, payload } = pendingPayment.value
       const conflicts = Array.isArray(pendingPayment.value.conflicts) ? pendingPayment.value.conflicts : []
-      const result = prepared.length > 0
+      const submittableGroups = getSubmittablePaymentGroups(pendingPayment.value)
+      const result = submittableGroups.length > 0
         ? await commissionsRepository.payQuotes(payload)
         : { submitted: false, failedPayments: [] }
       const submitted = result?.submitted !== false
       const failedPayments = Array.isArray(result?.failedPayments) ? result.failedPayments : []
 
       const failedGroups = new Set(
-        failedPayments.map((item) => `${item.userId}::${(item.transactionIds || []).slice().sort().join('|')}`),
+        failedPayments.map((item) => {
+          const transactions = Array.isArray(item.transactionIds)
+            ? item.transactionIds
+            : Array.isArray(item.transactions)
+              ? item.transactions
+              : []
+
+          return `${item.userId}::${transactions.slice().sort().join('|')}`
+        }),
       )
 
       let paidCount = 0
       let conflictCount = 0
 
       if (submitted) {
-        const successfulGroups = [...prepared, ...conflicts]
+        const successfulGroups = submittableGroups
 
         successfulGroups.forEach((group) => {
           const groupKey = `${group.userId}::${group.transactionIds.slice().sort().join('|')}`
@@ -651,9 +737,10 @@ export const useCommissionsStore = defineStore('commissions', () => {
             if (!group.transactionIds.includes(commission.transactionId)) return
 
             const backendStatus = group.status === 'Conflictivo' ? 'Conflictivo' : 'Pagado'
-            commission.estado = backendStatus === 'Conflictivo' ? 'Rechazado' : DISPLAY_STATUS_BY_BACKEND_STATUS.Pagado
+            commission.estado = DISPLAY_STATUS_BY_BACKEND_STATUS[backendStatus] || commission.estado
             commission.estadoBackend = backendStatus
-            commission.paymentDate = new Date().toISOString().slice(0, 10)
+            commission.paymentDate =
+              backendStatus === 'Pagado' ? new Date().toISOString().slice(0, 10) : ''
             if (backendStatus === 'Conflictivo') {
               conflictCount += 1
             } else {
@@ -665,7 +752,7 @@ export const useCommissionsStore = defineStore('commissions', () => {
 
       paymentSummary.value = {
         totalVisible,
-        prepared: prepared.length,
+        prepared: submittableGroups.length,
         paid: paidCount,
         conflicts: conflictCount || conflicts.length,
         rejected: rejected.length,
@@ -676,7 +763,7 @@ export const useCommissionsStore = defineStore('commissions', () => {
 
       pendingPayment.value = null
     } catch (paymentError) {
-      error.value = paymentError.message || 'No fue posible procesar los pagos.'
+      error.value = getMutationErrorMessage(paymentError, 'No fue posible procesar los pagos.')
     } finally {
       loading.value = false
     }

@@ -16,7 +16,12 @@ const emit = defineEmits(['close', 'confirm'])
 const preparedPreview = computed(() => props.preview.prepared.slice(0, 8))
 const conflictsPreview = computed(() => (props.preview.conflicts || []).slice(0, 8))
 const rejectedPreview = computed(() => props.preview.rejected.slice(0, 8))
-const totalAmount = computed(() =>
+const submittableRows = computed(() => [
+  ...props.preview.prepared,
+  ...(props.preview.conflicts || []),
+])
+const submittableCount = computed(() => submittableRows.value.length)
+const payableAmount = computed(() =>
   props.preview.prepared.reduce((sum, item) => sum + Number(item.totalComision || 0), 0),
 )
 
@@ -82,11 +87,11 @@ onBeforeUnmount(() => {
             </div>
             <div class="rounded-[8px] border border-moneyfy-100 bg-moneyfy-50 p-4">
               <p class="text-xs font-semibold uppercase text-moneyfy-700">Listas para enviar</p>
-              <p class="mt-2 text-2xl font-bold text-ink">{{ preview.prepared.length }}</p>
+              <p class="mt-2 text-2xl font-bold text-ink">{{ submittableCount }}</p>
             </div>
             <div class="rounded-[8px] border border-slate-200 p-4">
-              <p class="text-xs font-semibold uppercase text-slate-500">Monto total</p>
-              <p class="mt-2 text-2xl font-bold text-ink">{{ formatCurrency(totalAmount) }}</p>
+              <p class="text-xs font-semibold uppercase text-slate-500">Monto a pagar</p>
+              <p class="mt-2 text-2xl font-bold text-ink">{{ formatCurrency(payableAmount) }}</p>
             </div>
             <div class="rounded-[8px] border border-amber-100 bg-amber-50 p-4">
               <p class="text-xs font-semibold uppercase text-amber-700">Conflictivos</p>
@@ -99,9 +104,12 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="rounded-[8px] border border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-900">
-            Este archivo viene devuelto por el banco. Las filas con estado <strong>Pagado</strong> se enviaran al contrato actual de
-            <code class="font-semibold">/pay-quotes</code>
-            y, en paralelo, el frontend adjunta <code class="font-semibold">bankResponses</code> con estado, nota y voucher para el ajuste que esta haciendo backend.
+            Este archivo viene devuelto por el banco. Las filas con estado <strong>Pagado</strong> o <strong>Conflictivo</strong> se enviaran al contrato actual de
+            <code class="font-semibold">/api/v1/manager/pay-quotes</code>
+            usando el arreglo <code class="font-semibold">usersQuotes</code> con
+            <code class="font-semibold">userTransactionStatus</code>,
+            <code class="font-semibold">userNote</code> y
+            <code class="font-semibold">userVoucher</code>.
           </div>
 
           <div v-if="preview.prepared.length > 0" class="space-y-3">
@@ -177,13 +185,15 @@ onBeforeUnmount(() => {
               <table class="min-w-full divide-y divide-red-100 text-left text-xs">
                 <thead class="bg-red-100/70 text-red-700">
                   <tr>
-                    <th class="px-3 py-2 font-semibold">ID cotizacion</th>
+                    <th class="px-3 py-2 font-semibold">Referencia</th>
                     <th class="px-3 py-2 font-semibold">Motivo</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-red-100/80">
                   <tr v-for="row in rejectedPreview" :key="`${row.idCotizacion}-${row.reason}`">
-                    <td class="px-3 py-2 font-medium text-red-700">{{ row.idCotizacion }}</td>
+                    <td class="px-3 py-2 font-medium text-red-700">
+                      {{ row.idCotizacion || (row.rowNumber ? `Fila ${row.rowNumber}` : row.reference || 'N/A') }}
+                    </td>
                     <td class="px-3 py-2 text-red-700">{{ row.reason }}</td>
                   </tr>
                 </tbody>
@@ -198,7 +208,7 @@ onBeforeUnmount(() => {
             <BaseButton
               variant="dark"
               :loading="loading"
-              :disabled="preview.prepared.length === 0"
+              :disabled="submittableCount === 0"
               @click="$emit('confirm')"
             >
               Confirmar pagos

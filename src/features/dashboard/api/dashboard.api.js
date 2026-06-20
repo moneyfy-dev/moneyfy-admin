@@ -1,40 +1,30 @@
 import { apiClient } from '@/services/api/client'
-import { runtimeConfig } from '@/config/runtime'
 
-function getManagerHeaders() {
-  if (!runtimeConfig.managerApiKey) {
-    throw new Error('Falta configurar VITE_MONEYFY_API_KEY para consultar el dashboard.')
-  }
-
-  return {
-    'X-Moneyfy-Api-Key': runtimeConfig.managerApiKey,
-  }
+function normalizeNumber(value) {
+  const amount = Number(value)
+  return Number.isFinite(amount) ? amount : 0
 }
 
 function normalizeMetric(item) {
   return {
     date: item?.date || '',
     label: item?.label || item?.date || '',
-    commissions: Number(item?.commissions || 0),
-    sales: Number(item?.sales || 0),
-    users: Number(item?.users || 0),
+    commissions: normalizeNumber(item?.commissions),
+    sales: normalizeNumber(item?.sales),
+    users: normalizeNumber(item?.users),
   }
 }
 
 export const apiDashboardRepository = {
   async getSummary() {
-    const response = await apiClient.get('/api/v1/manager/dashboard/summary', {
-      headers: getManagerHeaders(),
-      skipAuth: true,
-      skipAuthRefresh: true,
-    })
+    const response = await apiClient.get('/api/v1/manager/dashboard/summary')
 
-    const data = response.data?.data || {}
+    const data = response.data?.data?.summary || response.data?.data || {}
 
     return {
-      activeUsers: Number(data.activeUsers || 0),
-      paidCommissions: Number(data.paidCommissions || 0),
-      pendingCommissions: Number(data.pendingCommissions || 0),
+      activeUsers: normalizeNumber(data.activeUsers),
+      paidCommissions: normalizeNumber(data.paidCommissions),
+      pendingCommissions: normalizeNumber(data.pendingCommissions),
       weeklyMetrics: Array.isArray(data.weeklyMetrics)
         ? data.weeklyMetrics.map(normalizeMetric)
         : [],

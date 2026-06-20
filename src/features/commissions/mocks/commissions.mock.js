@@ -14,15 +14,106 @@ export const mockCommissions = [
 const wait = (milliseconds = 250) =>
   new Promise((resolve) => window.setTimeout(resolve, milliseconds))
 
+const MOCK_CONTRACT_BY_QUOTE_ID = Object.freeze({
+  'Q-2026-1032': {
+    transactionId: 'tx-mock-1032',
+    userEmail: 'alejandro@moneyfy.test',
+    estadoBackend: 'Pendiente',
+  },
+  'Q-2026-1031': {
+    transactionId: 'tx-mock-1031',
+    userEmail: 'camila@moneyfy.test',
+    estadoBackend: 'Pagado',
+    selectedAccount: {
+      rut: '12.345.678-9',
+      holderName: 'Camila Herrera',
+      email: 'camila@moneyfy.test',
+      bank: 'Banco de Chile',
+      accountType: 'Corriente',
+      accountNumber: '1234567890',
+    },
+  },
+  'Q-2026-1030': {
+    transactionId: 'tx-mock-1030',
+    userEmail: 'luis@moneyfy.test',
+    estadoBackend: 'Aprobado',
+    selectedAccount: {
+      rut: '11.111.111-1',
+      holderName: 'Luis Rojas',
+      email: 'luis@moneyfy.test',
+      bank: 'Banco Santander',
+      accountType: 'Corriente',
+      accountNumber: '123456789',
+    },
+  },
+  'Q-2026-1029': {
+    transactionId: 'tx-mock-1029',
+    userEmail: 'paula@moneyfy.test',
+    estadoBackend: 'Rechazado',
+  },
+  'Q-2026-1028': {
+    transactionId: 'tx-mock-1028',
+    userEmail: 'rodrigo@moneyfy.test',
+    estadoBackend: 'Pendiente',
+  },
+  'Q-2026-1027': {
+    transactionId: 'tx-mock-1027',
+    userEmail: 'francisca@moneyfy.test',
+    estadoBackend: 'Pagado',
+    selectedAccount: {
+      rut: '15.555.555-5',
+      holderName: 'Francisca Mena',
+      email: 'francisca@moneyfy.test',
+      bank: 'BCI',
+      accountType: 'Vista',
+      accountNumber: '9988776655',
+    },
+  },
+  'Q-2026-1026': {
+    transactionId: 'tx-mock-1026',
+    userEmail: 'diego@moneyfy.test',
+    estadoBackend: 'Aprobado',
+    selectedAccount: null,
+  },
+  'Q-2026-1025': {
+    transactionId: null,
+    userEmail: 'natalia@moneyfy.test',
+    estadoBackend: 'Cotizando',
+  },
+  'Q-2026-1024': {
+    transactionId: null,
+    userEmail: 'marco@moneyfy.test',
+    estadoBackend: 'Cotizando',
+  },
+  'Q-2026-1023': {
+    transactionId: 'tx-mock-1023',
+    userEmail: 'javiera@moneyfy.test',
+    estadoBackend: 'Aprobado',
+    selectedAccount: {
+      rut: '17.777.777-7',
+      holderName: 'Javiera Morales',
+      email: 'javiera@moneyfy.test',
+      bank: 'Banco Estado',
+      accountType: 'Cuenta RUT',
+      accountNumber: '177777777',
+    },
+  },
+})
+
 export const mockCommissionsRepository = {
   async list() {
     await wait()
     return structuredClone(mockCommissions).map((commission, index) => ({
       ...commission,
+      ...MOCK_CONTRACT_BY_QUOTE_ID[commission.idCotizacion],
       userId: `mock-user-${index + 1}`,
       estadoBackend: commission.estado === 'Pendiente de aprobaciÃ³n'
         ? 'Pendiente'
         : commission.estado,
+      selectedAccount: MOCK_CONTRACT_BY_QUOTE_ID[commission.idCotizacion]?.selectedAccount || null,
+      transactionId: MOCK_CONTRACT_BY_QUOTE_ID[commission.idCotizacion]?.transactionId || null,
+      userEmail: MOCK_CONTRACT_BY_QUOTE_ID[commission.idCotizacion]?.userEmail || '',
+      estadoBackend: MOCK_CONTRACT_BY_QUOTE_ID[commission.idCotizacion]?.estadoBackend || commission.estado,
     }))
   },
 
@@ -50,11 +141,23 @@ export const mockCommissionsRepository = {
           },
           totalPayment: 33480,
         },
+        {
+          userId: 'mock-user-10',
+          userAccount: {
+            rut: '17.777.777-7',
+            holderName: 'Javiera Morales',
+            email: 'javiera@moneyfy.test',
+            bank: 'Banco Estado',
+            accountType: 'Cuenta RUT',
+            accountNumber: '177777777',
+          },
+          totalPayment: 31848,
+        },
       ],
       backendPayload: [
         {
           userId: 'mock-user-3',
-          transactions: ['tx-mock-3'],
+          transactions: ['tx-mock-1030'],
           userAccount: {
             rut: '11.111.111-1',
             holderName: 'Luis Rojas',
@@ -64,10 +167,34 @@ export const mockCommissionsRepository = {
             accountNumber: '123456789',
           },
           userPayment: 33480,
+          userTransactionStatus: 'Pagado',
+          userNote: null,
+          userVoucher: null,
+        },
+        {
+          userId: 'mock-user-10',
+          transactions: ['tx-mock-1023'],
+          userAccount: {
+            rut: '17.777.777-7',
+            holderName: 'Javiera Morales',
+            email: 'javiera@moneyfy.test',
+            bank: 'Banco Estado',
+            accountType: 'Cuenta RUT',
+            accountNumber: '177777777',
+          },
+          userPayment: 31848,
+          userTransactionStatus: 'Pagado',
+          userNote: null,
           userVoucher: null,
         },
       ],
-      conflicts: [],
+      conflicts: [
+        {
+          userId: 'mock-user-7',
+          userName: 'Diego Tapia',
+          message: 'Falta cuenta bancaria seleccionada para procesar este pago.',
+        },
+      ],
     }
   },
 

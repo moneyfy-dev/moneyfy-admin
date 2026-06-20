@@ -21,12 +21,12 @@ function normalizePaymentAccount(account) {
   if (!account || typeof account !== 'object') return null
 
   const normalized = {
-    rut: account.rut || account.personalId || '',
-    holderName: account.holderName || '',
-    email: account.email || '',
-    bank: account.bank || '',
-    accountType: account.accountType || '',
-    accountNumber: account.accountNumber || '',
+    rut: normalizeOptionalValue(account.rut || account.personalId) || '',
+    holderName: normalizeOptionalValue(account.holderName) || '',
+    email: normalizeOptionalValue(account.email) || '',
+    bank: normalizeOptionalValue(account.bank) || '',
+    accountType: normalizeOptionalValue(account.accountType) || '',
+    accountNumber: normalizeOptionalValue(account.accountNumber) || '',
   }
 
   return Object.values(normalized).some(Boolean) ? normalized : null
@@ -59,9 +59,85 @@ function normalizeCommissionStatus(row) {
   return quoteStatus || 'Cotización incompleta'
 }
 
+function resolveBackendStatus(transactionStatus, quoteStatus) {
+  if (transactionStatus === 'Conflictivo' || quoteStatus === 'Conflictivo') {
+    return 'Conflictivo'
+  }
+  if (transactionStatus === 'Pagado' || quoteStatus === 'Pagado') {
+    return 'Pagado'
+  }
+  if (transactionStatus === 'Aprobado' || quoteStatus === 'Aprobado') {
+    return 'Aprobado'
+  }
+  if (transactionStatus === 'Rechazado' || quoteStatus === 'Rechazado') {
+    return 'Rechazado'
+  }
+  if (transactionStatus === 'Caducado' || quoteStatus === 'Caducado') {
+    return 'Caducado'
+  }
+  if (transactionStatus === 'Pendiente' || quoteStatus === 'Pendiente') {
+    return 'Pendiente'
+  }
+
+  return transactionStatus || quoteStatus || ''
+}
+
+function normalizeResolvedCommissionStatus(backendStatus, quoteStatus) {
+  if (backendStatus === 'Aprobado') {
+    return 'Pendiente de pago'
+  }
+  if (backendStatus === 'Conflictivo') {
+    return 'Conflictivo'
+  }
+  if (backendStatus === 'Rechazado') {
+    return 'Rechazado'
+  }
+  if (backendStatus === 'Caducado') {
+    return 'Caducado'
+  }
+  if (backendStatus === 'Pagado') {
+    return 'Pagado'
+  }
+  if (backendStatus === 'Pendiente') {
+    return 'Pendiente de aprobaciÃ³n'
+  }
+  if (INCOMPLETE_QUOTE_STATUSES.has(quoteStatus)) {
+    return 'CotizaciÃ³n incompleta'
+  }
+
+  return backendStatus || quoteStatus || 'CotizaciÃ³n incompleta'
+}
+
+function normalizeDisplayStatus(backendStatus, quoteStatus) {
+  if (backendStatus === 'Aprobado') {
+    return 'Pendiente de pago'
+  }
+  if (backendStatus === 'Conflictivo') {
+    return 'Conflictivo'
+  }
+  if (backendStatus === 'Rechazado') {
+    return 'Rechazado'
+  }
+  if (backendStatus === 'Caducado') {
+    return 'Caducado'
+  }
+  if (backendStatus === 'Pagado') {
+    return 'Pagado'
+  }
+  if (backendStatus === 'Pendiente') {
+    return 'Pendiente de aprobación'
+  }
+  if (INCOMPLETE_QUOTE_STATUSES.has(quoteStatus)) {
+    return 'Cotización incompleta'
+  }
+
+  return backendStatus || quoteStatus || 'Cotización incompleta'
+}
+
 function normalizeCommission(row) {
   const transactionStatus = normalizeOptionalValue(row.transactionStatus)
   const quoteStatus = normalizeOptionalValue(row.quoteStatus)
+  const backendStatus = resolveBackendStatus(transactionStatus, quoteStatus)
 
   return {
     userId: row.idUser || '',
@@ -70,8 +146,8 @@ function normalizeCommission(row) {
       ? row.quoterBuyerFullname
       : row.userFullname || 'No disponible',
     patente: row.quoterCarPpu === 'N/A' ? '' : row.quoterCarPpu || '',
-    estado: normalizeCommissionStatus(row),
-    estadoBackend: transactionStatus || quoteStatus || '',
+    estado: normalizeDisplayStatus(backendStatus, quoteStatus),
+    estadoBackend: backendStatus,
     fecha: normalizeDate(row.inicialDate),
     compania: normalizeOptionalValue(row.quoterPlanInsurer),
     totalComision: normalizeAmount(row.transactionTotalCommission),
@@ -88,29 +164,6 @@ function normalizeCommission(row) {
   }
 }
 
-function getManagerHeaders() {
-  if (!runtimeConfig.managerApiKey) {
-    throw new Error('Falta configurar VITE_MONEYFY_API_KEY para consultar el dashboard.')
-  }
-
-  return {
-    'X-Moneyfy-Api-Key': runtimeConfig.managerApiKey,
-  }
-}
-
-function shouldFallbackToLegacyFinalize(error) {
-  const info = String(error?.fields?.info || '').toLowerCase()
-  const message = String(error?.message || '').toLowerCase()
-
-  return (
-    (error?.status === 404 || error?.status === 424) &&
-    (
-      info.includes('no static resource api/v1/manager/finalize/quote') ||
-      message.includes('no static resource api/v1/manager/finalize/quote')
-    )
-  )
-}
-
 export const apiCommissionsRepository = {
   async list(filters = {}) {
     const pageSize = runtimeConfig.managerPageSize
@@ -120,15 +173,12 @@ export const apiCommissionsRepository = {
 
     do {
       const response = await apiClient.get('/api/v1/manager/dashboard/quotes', {
-        headers: getManagerHeaders(),
         params: {
           page,
           size: pageSize,
           userId: filters.userId || undefined,
           quoteStatus: filters.quoteStatus || undefined,
         },
-        skipAuth: true,
-        skipAuthRefresh: true,
       })
       const data = response.data?.data
       const content = Array.isArray(data?.content) ? data.content : []
@@ -149,36 +199,14 @@ export const apiCommissionsRepository = {
       }
     }
 
-    try {
-      const response = await apiClient.put('/api/v1/manager/finalize/quote', payload, {
-        headers: getManagerHeaders(),
-        skipAuth: true,
-        skipAuthRefresh: true,
-      })
-      return response.data?.data || response.data
-    } catch (error) {
-      if (!shouldFallbackToLegacyFinalize(error)) {
-        throw error
-      }
-
-      const legacyResponse = await apiClient.put('/quoter/finalize/quote', payload, {
-        headers: getManagerHeaders(),
-        skipAuth: true,
-        skipAuthRefresh: true,
-      })
-
-      return legacyResponse.data?.data || legacyResponse.data
-    }
+    const response = await apiClient.put('/api/v1/manager/finalize/quote', payload)
+    return response.data?.data || response.data
   },
 
   async generatePaymentReport(payload) {
-    const response = await apiClient.post('/api/v1/manager/pay-quotes/report', payload, {
-      headers: getManagerHeaders(),
-      skipAuth: true,
-      skipAuthRefresh: true,
-    })
+    const response = await apiClient.post('/api/v1/manager/pay-quotes/report', payload)
 
-    const data = response.data?.data || {}
+    const data = response.data?.data?.report || response.data?.data || {}
 
     return {
       bankPayroll: Array.isArray(data.bankPayroll)
@@ -194,6 +222,8 @@ export const apiCommissionsRepository = {
             transactions: Array.isArray(item.transactions) ? item.transactions.filter(Boolean) : [],
             userAccount: normalizeReportAccount(item.userAccount),
             userPayment: normalizeAmount(item.userPayment),
+            userTransactionStatus: normalizeOptionalValue(item.userTransactionStatus),
+            userNote: item.userNote || null,
             userVoucher: item.userVoucher || null,
           }))
         : [],
@@ -215,11 +245,7 @@ export const apiCommissionsRepository = {
       }
     }
 
-    const response = await apiClient.post('/api/v1/manager/pay-quotes', payload, {
-      headers: getManagerHeaders(),
-      skipAuth: true,
-      skipAuthRefresh: true,
-    })
+    const response = await apiClient.post('/api/v1/manager/pay-quotes', payload)
 
     return response.data?.data || response.data
   },

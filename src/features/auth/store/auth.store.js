@@ -23,7 +23,16 @@ export const useAuthStore = defineStore('auth', () => {
       return
     }
 
-    user.value = tokenStorage.getUser()
+    const storedUser = tokenStorage.getUser()
+
+    if (!storedUser) {
+      tokenStorage.clear()
+      user.value = null
+      initialized.value = true
+      return
+    }
+
+    user.value = storedUser
     initialized.value = true
   }
 
@@ -33,12 +42,20 @@ export const useAuthStore = defineStore('auth', () => {
 
     try {
       const session = await authRepository.signIn(credentials)
+      const manager = session.manager
+
+      if (!manager || !session.sessionToken || !session.refreshToken) {
+        throw new Error('Respuesta de autenticacion administrativa invalida.')
+      }
+
+      tokenStorage.setUser(manager)
       tokenStorage.setSessionToken(session.sessionToken)
       tokenStorage.setRefreshToken(session.refreshToken)
-      tokenStorage.setUser(session.user)
-      user.value = session.user
-      return session.user
+      user.value = manager
+      return manager
     } catch (signInError) {
+      tokenStorage.clear()
+      user.value = null
       error.value =
         signInError.code === 'NETWORK_ERROR'
           ? 'No fue posible conectar con el servidor.'
@@ -67,6 +84,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function logout() {
     try {
       await authRepository.logout()
+    } catch {
     } finally {
       tokenStorage.clear()
       user.value = null

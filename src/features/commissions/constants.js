@@ -2,6 +2,7 @@ export const COMMISSION_STATUSES = Object.freeze([
   'Pendiente de aprobación',
   'Pendiente de pago',
   'Pagado',
+  'Conflictivo',
   'Rechazado',
   'Caducado',
 ])

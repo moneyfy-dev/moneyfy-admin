@@ -1,9 +1,20 @@
 import { apiClient } from '@/services/api/client'
 
+function normalizeSessionPayload(payload) {
+  const data = payload?.data || payload || {}
+
+  return {
+    manager: data.manager || data.user || null,
+    sessionToken: data.sessionToken || data.token || null,
+    refreshToken: data.refreshToken || null,
+    message: payload?.message || data.message || '',
+  }
+}
+
 export const apiAuthRepository = {
   async signIn(credentials) {
     const response = await apiClient.post(
-      '/manager/auth/log-in',
+      '/api/v1/manager/auth/log-in',
       {
         email: credentials.email,
         pwd: credentials.password,
@@ -13,12 +24,12 @@ export const apiAuthRepository = {
         skipAuthRefresh: true,
       },
     )
-    return response.data?.data || response.data
+    return normalizeSessionPayload(response.data)
   },
 
   async recoverPassword(email) {
     const response = await apiClient.post(
-      '/auth/restore/password',
+      '/api/v1/manager/auth/restore/password',
       { email },
       { skipAuth: true, skipAuthRefresh: true },
     )
@@ -26,6 +37,6 @@ export const apiAuthRepository = {
   },
 
   async logout() {
-    await apiClient.post('/auth/logout')
+    await apiClient.post('/api/v1/manager/auth/logout')
   },
 }

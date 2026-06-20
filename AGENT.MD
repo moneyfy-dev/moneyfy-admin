@@ -37,8 +37,9 @@ Alcance inicial:
 - Papa Parse.
 - JavaScript.
 
-La aplicacion usa rutas y features independientes. Los datos siguen siendo mock
-hasta recibir los contratos definitivos del backend.
+La aplicacion usa rutas y features independientes. Los mocks siguen disponibles
+como fallback controlado, pero el contrato administrativo actual se integra con
+JWT sobre `/api/v1/manager/*`.
 
 ## Comandos
 
@@ -63,9 +64,9 @@ Variables disponibles:
 ```env
 VITE_USE_MOCKS=true
 VITE_COMMISSIONS_USE_MOCKS=true
+VITE_DASHBOARD_USE_MOCKS=true
 VITE_API_URL=https://api.moneyfy.cl/moneyfy
 VITE_API_TIMEOUT=15000
-VITE_MONEYFY_API_KEY=
 VITE_MANAGER_PAGE_SIZE=100
 VITE_STATUS_UPDATES_ENABLED=false
 ```
@@ -399,9 +400,12 @@ Estados obligatorios:
 - No confiar en extensiones; validar MIME y contenido.
 - Evitar datos personales en logs.
 - No guardar respuestas completas del backend en consola.
-- Variables `VITE_*` son publicas en el bundle: nunca contienen secretos. La API key
-  temporal del manager solo se admite para desarrollo local; produccion debe usar
-  autenticacion administrativa o un backend intermedio.
+- Variables `VITE_*` son publicas en el bundle: nunca contienen secretos.
+- La autenticacion administrativa actual depende de `sessionToken` y `refreshToken`
+  emitidos por `/api/v1/manager/auth/*`, no de API keys embebidas en frontend.
+- `VITE_STATUS_UPDATES_ENABLED` existe como interruptor de seguridad para evitar
+  escrituras accidentales en ambientes de desarrollo cuando se trabaja contra
+  endpoints reales.
 - Configurar CSP, HTTPS y cabeceras de seguridad en el hosting.
 
 ## Rendimiento
@@ -461,7 +465,6 @@ Una tarea no esta terminada si:
 No implementar como definitivas hasta recibir confirmacion:
 
 - URL y version de la API administrativa.
-- Contrato de login, refresh y recuperacion.
 - Roles y permisos.
 - Endpoints de dashboard, usuarios y comisiones.
 - Paginacion, filtros y ordenamiento soportados por backend.

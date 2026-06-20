@@ -197,7 +197,7 @@ async function importPaymentFile(event) {
             <template v-else>
               {{ commissionsStore.importSummary.prepared }} actualizaciones validadas y preparadas,
               {{ commissionsStore.importSummary.rejected }} rechazadas. No se enviaron al backend
-              porque la autenticacion administrativa aun no esta habilitada.
+              porque el interruptor de escrituras administrativas sigue deshabilitado en este ambiente.
             </template>
           </p>
           <p
@@ -207,12 +207,12 @@ async function importPaymentFile(event) {
           >
             <template v-if="commissionsStore.paymentSummary.submitted">
               {{ commissionsStore.paymentSummary.paid }} comisiones marcadas como pagadas,
-              {{ commissionsStore.paymentSummary.conflicts }} filas conflictivas conservadas fuera del pago,
+              {{ commissionsStore.paymentSummary.conflicts }} filas marcadas como conflictivas,
               {{ commissionsStore.paymentSummary.failed }} grupos rechazados por el backend y
               {{ commissionsStore.paymentSummary.rejected }} filas invalidadas antes del envio.
             </template>
             <template v-else>
-              No se enviaron pagos al backend.
+              No se enviaron pagos al backend porque el interruptor de escrituras administrativas sigue deshabilitado en este ambiente.
             </template>
           </p>
           <p
