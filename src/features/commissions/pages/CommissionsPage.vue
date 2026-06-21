@@ -24,6 +24,10 @@ onMounted(() => {
   if (commissionsStore.items.length === 0) {
     commissionsStore.fetchCommissions()
   }
+
+  if (commissionsStore.moneyfyerRows.length === 0) {
+    commissionsStore.fetchMoneyfyers()
+  }
 })
 
 function openPaymentReview() {
@@ -256,7 +260,26 @@ async function importPaymentFile(event) {
       </div>
 
       <div class="p-5">
-        <MoneyfyerSummaryTable :items="commissionsStore.moneyfyerRows" />
+        <p class="mb-3 text-xs text-slate-500">
+          Consolidado entregado por backend para revisar cuanto gana cada moneyfyer y preparar la nomina bancaria.
+        </p>
+        <p class="mb-4 text-[11px] text-slate-400">
+          Este bloque usa el endpoint dedicado <code>/api/v1/manager/moneyfyers</code> y no depende de los filtros de la tabla superior.
+        </p>
+        <div v-if="commissionsStore.moneyfyersLoading" class="space-y-3">
+          <div v-for="index in 4" :key="index" class="h-12 animate-pulse rounded-[8px] bg-slate-100"></div>
+        </div>
+        <p
+          v-else-if="commissionsStore.moneyfyersError"
+          class="rounded-[8px] bg-red-50 px-3 py-2 text-xs font-medium text-red-700"
+          role="alert"
+        >
+          {{ commissionsStore.moneyfyersError }}
+        </p>
+        <MoneyfyerSummaryTable
+          v-else
+          :items="commissionsStore.moneyfyerRows"
+        />
       </div>
     </section>
 

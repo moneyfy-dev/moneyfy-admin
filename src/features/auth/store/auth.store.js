@@ -10,8 +10,17 @@ export const useAuthStore = defineStore('auth', () => {
   const initialized = ref(false)
   const error = ref('')
   const recoveryMessage = ref('')
+  const resetMessage = ref('')
 
   const isAuthenticated = computed(() => Boolean(user.value && tokenStorage.hasSession()))
+
+  function resolveAuthErrorMessage(requestError, fallbackMessage) {
+    if (requestError.code === 'NETWORK_ERROR') {
+      return 'No fue posible conectar con el servidor.'
+    }
+
+    return requestError.message || fallbackMessage
+  }
 
   async function initialize() {
     if (initialized.value) return
@@ -56,10 +65,7 @@ export const useAuthStore = defineStore('auth', () => {
     } catch (signInError) {
       tokenStorage.clear()
       user.value = null
-      error.value =
-        signInError.code === 'NETWORK_ERROR'
-          ? 'No fue posible conectar con el servidor.'
-          : signInError.message || 'No fue posible iniciar sesion.'
+      error.value = resolveAuthErrorMessage(signInError, 'No fue posible iniciar sesion.')
       throw signInError
     } finally {
       loading.value = false
@@ -69,13 +75,70 @@ export const useAuthStore = defineStore('auth', () => {
   async function recoverPassword(email) {
     loading.value = true
     recoveryMessage.value = ''
+    resetMessage.value = ''
     error.value = ''
 
     try {
       const result = await authRepository.recoverPassword(email)
       recoveryMessage.value = result.message || 'Solicitud enviada correctamente.'
+      return result
     } catch (recoveryError) {
-      error.value = recoveryError.message || 'No fue posible solicitar la recuperacion.'
+      error.value = resolveAuthErrorMessage(
+        recoveryError,
+        'No fue posible solicitar la recuperacion.',
+      )
+      throw recoveryError
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function resendCode(email) {
+    loading.value = true
+    recoveryMessage.value = ''
+    resetMessage.value = ''
+    error.value = ''
+
+    try {
+      const result = await authRepository.resendCode(email)
+      recoveryMessage.value = result.message || 'Codigo reenviado correctamente.'
+      return result
+    } catch (resendError) {
+      error.value = resolveAuthErrorMessage(resendError, 'No fue posible reenviar el codigo.')
+      throw resendError
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function confirmPasswordReset(payload) {
+    loading.value = true
+    recoveryMessage.value = ''
+    resetMessage.value = ''
+    error.value = ''
+
+    try {
+      const session = await authRepository.confirmPasswordReset(payload)
+      const manager = session.manager
+
+      if (!manager || !session.sessionToken || !session.refreshToken) {
+        throw new Error('Respuesta invalida al confirmar el cambio de contrasena.')
+      }
+
+      tokenStorage.setUser(manager)
+      tokenStorage.setSessionToken(session.sessionToken)
+      tokenStorage.setRefreshToken(session.refreshToken)
+      user.value = manager
+      resetMessage.value = session.message || 'Contrasena actualizada correctamente.'
+      return manager
+    } catch (resetError) {
+      tokenStorage.clear()
+      user.value = null
+      error.value = resolveAuthErrorMessage(
+        resetError,
+        'No fue posible actualizar la contrasena.',
+      )
+      throw resetError
     } finally {
       loading.value = false
     }
@@ -94,6 +157,7 @@ export const useAuthStore = defineStore('auth', () => {
   function clearFeedback() {
     error.value = ''
     recoveryMessage.value = ''
+    resetMessage.value = ''
   }
 
   setUnauthorizedHandler(() => {
@@ -108,10 +172,13 @@ export const useAuthStore = defineStore('auth', () => {
     initialized,
     error,
     recoveryMessage,
+    resetMessage,
     isAuthenticated,
     initialize,
     signIn,
     recoverPassword,
+    resendCode,
+    confirmPasswordReset,
     logout,
     clearFeedback,
   }

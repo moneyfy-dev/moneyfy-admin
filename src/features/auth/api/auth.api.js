@@ -30,10 +30,33 @@ export const apiAuthRepository = {
   async recoverPassword(email) {
     const response = await apiClient.post(
       '/api/v1/manager/auth/restore/password',
-      { email },
+      { email, type: 'password_recovery' },
       { skipAuth: true, skipAuthRefresh: true },
     )
     return response.data?.data || response.data
+  },
+
+  async resendCode(email) {
+    const response = await apiClient.put(
+      '/api/v1/manager/auth/resend/code',
+      { email, type: 'password_recovery' },
+      { skipAuth: true, skipAuthRefresh: true },
+    )
+    return response.data?.data || response.data
+  },
+
+  async confirmPasswordReset(payload) {
+    const response = await apiClient.put(
+      '/api/v1/manager/auth/confirm/password/reset',
+      {
+        email: payload.email,
+        code: payload.code,
+        newPwd: payload.password,
+        repeatedPwd: payload.repeatedPassword,
+      },
+      { skipAuth: true, skipAuthRefresh: true },
+    )
+    return normalizeSessionPayload(response.data)
   },
 
   async logout() {

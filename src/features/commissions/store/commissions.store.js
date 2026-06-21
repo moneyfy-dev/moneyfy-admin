@@ -184,87 +184,6 @@ function collectPaymentGroups(sourceItems) {
   }
 }
 
-function collectMoneyfyerRows(sourceItems) {
-  const grouped = new Map()
-
-  sourceItems.forEach((commission) => {
-    if (!commission.userId) {
-      return
-    }
-
-    if (!grouped.has(commission.userId)) {
-      grouped.set(commission.userId, {
-        userId: commission.userId,
-        nombre: commission.nombre,
-        email: commission.userEmail || '',
-        selectedAccount: commission.selectedAccount || null,
-        quoteIds: new Set(),
-        pendingApprovalAmount: 0,
-        pendingPaymentAmount: 0,
-        conflictiveAmount: 0,
-        paidAmount: 0,
-      })
-    }
-
-    const row = grouped.get(commission.userId)
-    row.quoteIds.add(commission.idCotizacion)
-
-    if (!row.selectedAccount && commission.selectedAccount) {
-      row.selectedAccount = commission.selectedAccount
-    }
-
-    const amount = Number(commission.totalComision || 0)
-
-    if (commission.estadoBackend === 'Pagado') {
-      row.paidAmount += amount
-      return
-    }
-
-    if (commission.estadoBackend === 'Conflictivo') {
-      row.conflictiveAmount += amount
-      return
-    }
-
-    if (commission.estadoBackend === 'Aprobado') {
-      row.pendingPaymentAmount += amount
-      return
-    }
-
-    if (commission.estadoBackend === 'Pendiente' || commission.estado === 'Pendiente de aprobación') {
-      row.pendingApprovalAmount += amount
-    }
-  })
-
-  return Array.from(grouped.values())
-    .map((row) => {
-      const accountDataAvailable = hasCompletePaymentAccount(row.selectedAccount)
-      const totalGeneratedAmount =
-        row.pendingPaymentAmount + row.paidAmount + row.conflictiveAmount
-      let statusLabel = 'Sin comisiones aprobadas'
-
-      if (row.pendingPaymentAmount > 0 && !accountDataAvailable) {
-        statusLabel = 'Falta cuenta bancaria'
-      } else if (row.pendingPaymentAmount > 0) {
-        statusLabel = 'Listo para nómina'
-      } else if (row.pendingApprovalAmount > 0) {
-        statusLabel = 'Pendiente de aprobación'
-      } else if (row.conflictiveAmount > 0) {
-        statusLabel = 'Conflictivo'
-      } else if (row.paidAmount > 0) {
-        statusLabel = 'Pagado'
-      }
-
-      return {
-        ...row,
-        quoteCount: row.quoteIds.size,
-        totalGeneratedAmount,
-        accountDataAvailable,
-        statusLabel,
-      }
-    })
-    .sort((first, second) => first.nombre.localeCompare(second.nombre, 'es'))
-}
-
 function getSubmittablePaymentGroups(preview) {
   return [
     ...(Array.isArray(preview?.prepared) ? preview.prepared : []),
@@ -415,8 +334,11 @@ export const useCommissionsStore = defineStore('commissions', () => {
   let paymentSummaryTimer = null
 
   const items = ref([])
+  const moneyfyerRows = ref([])
   const loading = ref(false)
+  const moneyfyersLoading = ref(false)
   const error = ref('')
+  const moneyfyersError = ref('')
   const importSummary = ref(null)
   const pendingImport = ref(null)
   const paymentSummary = ref(null)
@@ -478,7 +400,6 @@ export const useCommissionsStore = defineStore('commissions', () => {
   })
 
   const paymentPreparation = computed(() => collectPaymentGroups(filteredItems.value))
-  const moneyfyerRows = computed(() => collectMoneyfyerRows(filteredItems.value))
 
   function scheduleImportSummaryClear() {
     if (importSummaryTimer) {
@@ -658,6 +579,8 @@ export const useCommissionsStore = defineStore('commissions', () => {
           commission.estado = DISPLAY_STATUS_BY_BACKEND_STATUS[estado] || commission.estado
           commission.estadoBackend = estado
         })
+
+        await fetchMoneyfyers()
       }
 
       importSummary.value = {
@@ -675,6 +598,23 @@ export const useCommissionsStore = defineStore('commissions', () => {
       error.value = getMutationErrorMessage(importError, 'No fue posible actualizar las comisiones.')
     } finally {
       loading.value = false
+    }
+  }
+
+  async function fetchMoneyfyers() {
+    moneyfyersLoading.value = true
+    moneyfyersError.value = ''
+
+    try {
+      moneyfyerRows.value = await commissionsRepository.getMoneyfyers()
+    } catch (fetchError) {
+      moneyfyerRows.value = []
+      moneyfyersError.value = getMutationErrorMessage(
+        fetchError,
+        'No fue posible cargar el consolidado de moneyfyers.',
+      )
+    } finally {
+      moneyfyersLoading.value = false
     }
   }
 
@@ -748,6 +688,8 @@ export const useCommissionsStore = defineStore('commissions', () => {
             }
           })
         })
+
+        await fetchMoneyfyers()
       }
 
       paymentSummary.value = {
@@ -771,8 +713,11 @@ export const useCommissionsStore = defineStore('commissions', () => {
 
   return {
     items,
+    moneyfyerRows,
     loading,
+    moneyfyersLoading,
     error,
+    moneyfyersError,
     filters,
     sorting,
     importSummary,
@@ -781,9 +726,9 @@ export const useCommissionsStore = defineStore('commissions', () => {
     pendingPayment,
     filteredItems,
     paymentPreparation,
-    moneyfyerRows,
     generatePaymentPreview,
     fetchCommissions,
+    fetchMoneyfyers,
     setSort,
     resetDateRange,
     clearPendingImport,

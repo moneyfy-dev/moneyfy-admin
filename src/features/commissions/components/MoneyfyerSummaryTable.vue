@@ -49,8 +49,8 @@ function statusClass(statusLabel) {
   <EmptyState
     v-if="items.length === 0"
     icon="ri-user-shared-line"
-    title="No hay moneyfyers con comisiones visibles"
-    message="Ajusta los filtros de la tabla superior para consolidar usuarios beneficiarios."
+    title="No hay moneyfyers disponibles"
+    message="El backend no devolvio moneyfyers para este consolidado."
   />
 
   <div v-else class="overflow-x-auto">

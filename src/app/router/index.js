@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { pinia } from '@/app/providers/pinia'
 import { useAuthStore } from '@/features/auth/store/auth.store'
 import LoginPage from '@/features/auth/pages/LoginPage.vue'
+import RecoverPasswordPage from '@/features/auth/pages/RecoverPasswordPage.vue'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import DashboardPage from '@/features/dashboard/pages/DashboardPage.vue'
 import CommissionsPage from '@/features/commissions/pages/CommissionsPage.vue'
@@ -12,6 +13,12 @@ const routes = [
     path: '/login',
     name: 'login',
     component: LoginPage,
+    meta: { public: true },
+  },
+  {
+    path: '/recuperar-contrasena',
+    name: 'recover-password',
+    component: RecoverPasswordPage,
     meta: { public: true },
   },
   {
@@ -47,7 +54,7 @@ router.beforeEach(async (to) => {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
 
-  if (to.name === 'login' && authStore.isAuthenticated) {
+  if (to.meta.public && authStore.isAuthenticated) {
     return { name: 'dashboard' }
   }
 

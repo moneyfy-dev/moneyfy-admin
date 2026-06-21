@@ -14,6 +14,15 @@ export const mockCommissions = [
 const wait = (milliseconds = 250) =>
   new Promise((resolve) => window.setTimeout(resolve, milliseconds))
 
+function normalizeMockDisplayStatus(backendStatus) {
+  if (backendStatus === 'Aprobado') return 'Pendiente de pago'
+  if (backendStatus === 'Pagado') return 'Pagado'
+  if (backendStatus === 'Rechazado') return 'Rechazado'
+  if (backendStatus === 'Caducado') return 'Caducado'
+  if (backendStatus === 'Pendiente') return 'Pendiente de aprobación'
+  return 'Cotización incompleta'
+}
+
 const MOCK_CONTRACT_BY_QUOTE_ID = Object.freeze({
   'Q-2026-1032': {
     transactionId: 'tx-mock-1032',
@@ -103,18 +112,21 @@ const MOCK_CONTRACT_BY_QUOTE_ID = Object.freeze({
 export const mockCommissionsRepository = {
   async list() {
     await wait()
-    return structuredClone(mockCommissions).map((commission, index) => ({
-      ...commission,
-      ...MOCK_CONTRACT_BY_QUOTE_ID[commission.idCotizacion],
-      userId: `mock-user-${index + 1}`,
-      estadoBackend: commission.estado === 'Pendiente de aprobaciÃ³n'
-        ? 'Pendiente'
-        : commission.estado,
-      selectedAccount: MOCK_CONTRACT_BY_QUOTE_ID[commission.idCotizacion]?.selectedAccount || null,
-      transactionId: MOCK_CONTRACT_BY_QUOTE_ID[commission.idCotizacion]?.transactionId || null,
-      userEmail: MOCK_CONTRACT_BY_QUOTE_ID[commission.idCotizacion]?.userEmail || '',
-      estadoBackend: MOCK_CONTRACT_BY_QUOTE_ID[commission.idCotizacion]?.estadoBackend || commission.estado,
-    }))
+    return structuredClone(mockCommissions).map((commission, index) => {
+      const backendContract = MOCK_CONTRACT_BY_QUOTE_ID[commission.idCotizacion] || {}
+      const estadoBackend = backendContract.estadoBackend || commission.estado
+
+      return {
+        ...commission,
+        ...backendContract,
+        userId: `mock-user-${index + 1}`,
+        estado: normalizeMockDisplayStatus(estadoBackend),
+        estadoBackend,
+        selectedAccount: backendContract.selectedAccount || null,
+        transactionId: backendContract.transactionId || null,
+        userEmail: backendContract.userEmail || '',
+      }
+    })
   },
 
   async updateStatuses(updates) {
@@ -196,6 +208,68 @@ export const mockCommissionsRepository = {
         },
       ],
     }
+  },
+
+  async getMoneyfyers() {
+    await wait()
+    return [
+      {
+        userId: 'mock-user-3',
+        nombre: 'Luis Rojas',
+        email: 'luis@moneyfy.test',
+        selectedAccount: {
+          rut: '11.111.111-1',
+          holderName: 'Luis Rojas',
+          email: 'luis@moneyfy.test',
+          bank: 'Banco Santander',
+          accountType: 'Corriente',
+          accountNumber: '123456789',
+        },
+        quoteCount: 1,
+        pendingPaymentAmount: 33480,
+        paidAmount: 0,
+        totalGeneratedAmount: 33480,
+        accountDataAvailable: true,
+        statusLabel: 'Listo para nómina',
+        ownCommissions: 33480,
+        referredCommissions: 0,
+      },
+      {
+        userId: 'mock-user-7',
+        nombre: 'Diego Tapia',
+        email: 'diego@moneyfy.test',
+        selectedAccount: null,
+        quoteCount: 1,
+        pendingPaymentAmount: 48992,
+        paidAmount: 0,
+        totalGeneratedAmount: 48992,
+        accountDataAvailable: false,
+        statusLabel: 'Falta cuenta bancaria',
+        ownCommissions: 48992,
+        referredCommissions: 0,
+      },
+      {
+        userId: 'mock-user-10',
+        nombre: 'Javiera Morales',
+        email: 'javiera@moneyfy.test',
+        selectedAccount: {
+          rut: '17.777.777-7',
+          holderName: 'Javiera Morales',
+          email: 'javiera@moneyfy.test',
+          bank: 'Banco Estado',
+          accountType: 'Cuenta RUT',
+          accountNumber: '177777777',
+        },
+        quoteCount: 1,
+        pendingPaymentAmount: 0,
+        paidAmount: 31848,
+        totalGeneratedAmount: 31848,
+        accountDataAvailable: true,
+        statusLabel: 'Pagado',
+        ownCommissions: 31848,
+        referredCommissions: 0,
+      },
+    ]
   },
 
   async payQuotes(payload) {

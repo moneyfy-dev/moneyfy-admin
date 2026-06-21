@@ -28,8 +28,12 @@ async function submit() {
   }
 }
 
-function recoverPassword() {
-  authStore.recoverPassword(form.email)
+function openRecoveryFlow() {
+  authStore.clearFeedback()
+  router.push({
+    name: 'recover-password',
+    query: form.email ? { email: form.email } : undefined,
+  })
 }
 </script>
 
@@ -122,22 +126,14 @@ function recoverPassword() {
             <button
               class="flex w-full items-center justify-between text-left text-xs font-semibold text-slate-700"
               type="button"
-              @click="recoverPassword"
+              @click="openRecoveryFlow"
             >
-              <span>Olvide o necesito recordar mi contrasena</span>
+              <span>Olvide, necesito activar o restablecer mi contrasena</span>
               <i class="ri-key-2-line text-lg text-moneyfy-600"></i>
             </button>
-            <p
-              v-if="authStore.recoveryMessage"
-              class="mt-3 text-xs leading-6 text-slate-600"
-              role="status"
-            >
-              {{ authStore.recoveryMessage }}
-            </p>
           </div>
         </div>
       </section>
     </div>
   </main>
 </template>
-

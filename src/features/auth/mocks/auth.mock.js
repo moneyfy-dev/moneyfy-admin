@@ -66,6 +66,70 @@ export const mockAuthRepository = {
     }
   },
 
+  async resendCode(email) {
+    await wait()
+
+    if (String(email || '').toLowerCase() === 'root.moneyfyapp@gmail.com') {
+      throw new ApiError({
+        status: 400,
+        code: 'BAD_REQUEST',
+        message: 'El administrador principal no puede restablecer su contrasena mediante este flujo',
+      })
+    }
+
+    return {
+      message: 'se reenvio el codigo para reestrablecer la contrasena del usuario',
+    }
+  },
+
+  async confirmPasswordReset({ email, code, password, repeatedPassword }) {
+    await wait()
+
+    const normalizedEmail = String(email || '').toLowerCase()
+
+    if (normalizedEmail === 'root.moneyfyapp@gmail.com') {
+      throw new ApiError({
+        status: 400,
+        code: 'BAD_REQUEST',
+        message: 'El administrador principal no puede restablecer su contrasena mediante este flujo',
+      })
+    }
+
+    if (!code || code !== '123456') {
+      throw new ApiError({
+        status: 400,
+        code: 'BAD_REQUEST',
+        message: 'Error de codigo: el codigo de confirmacion es invalido',
+      })
+    }
+
+    if (!password || !repeatedPassword) {
+      throw new ApiError({
+        status: 400,
+        code: 'BAD_REQUEST',
+        message: 'Error de formato: las contrasenas no pueden estar vacias',
+      })
+    }
+
+    if (password !== repeatedPassword) {
+      throw new ApiError({
+        status: 400,
+        code: 'BAD_REQUEST',
+        message: 'Error de formato: las contrasenas no coinciden',
+      })
+    }
+
+    return {
+      manager: {
+        ...DEMO_ADMIN,
+        email: normalizedEmail || DEMO_ADMIN.email,
+      },
+      sessionToken: 'moneyfy-admin-demo-session-token-reset',
+      refreshToken: 'moneyfy-admin-demo-refresh-token-reset',
+      message: 'se reestablecio su contrasena',
+    }
+  },
+
   async logout() {
     await wait(100)
   },

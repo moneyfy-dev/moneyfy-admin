@@ -134,6 +134,17 @@ function normalizeDisplayStatus(backendStatus, quoteStatus) {
   return backendStatus || quoteStatus || 'Cotización incompleta'
 }
 
+function normalizeUiStatus(backendStatus, quoteStatus) {
+  if (backendStatus === 'Aprobado') return 'Pendiente de pago'
+  if (backendStatus === 'Conflictivo') return 'Conflictivo'
+  if (backendStatus === 'Rechazado') return 'Rechazado'
+  if (backendStatus === 'Caducado') return 'Caducado'
+  if (backendStatus === 'Pagado') return 'Pagado'
+  if (backendStatus === 'Pendiente') return 'Pendiente de aprobación'
+  if (INCOMPLETE_QUOTE_STATUSES.has(quoteStatus)) return 'Cotización incompleta'
+  return backendStatus || quoteStatus || 'Cotización incompleta'
+}
+
 function normalizeCommission(row) {
   const transactionStatus = normalizeOptionalValue(row.transactionStatus)
   const quoteStatus = normalizeOptionalValue(row.quoteStatus)
@@ -146,7 +157,7 @@ function normalizeCommission(row) {
       ? row.quoterBuyerFullname
       : row.userFullname || 'No disponible',
     patente: row.quoterCarPpu === 'N/A' ? '' : row.quoterCarPpu || '',
-    estado: normalizeDisplayStatus(backendStatus, quoteStatus),
+    estado: normalizeUiStatus(backendStatus, quoteStatus),
     estadoBackend: backendStatus,
     fecha: normalizeDate(row.inicialDate),
     compania: normalizeOptionalValue(row.quoterPlanInsurer),
@@ -161,6 +172,40 @@ function normalizeCommission(row) {
     selectedAccount: normalizePaymentAccount(
       row.selectedAccount || row.userSelectedAccount || row.userAccount || row.account,
     ),
+  }
+}
+
+function normalizeMoneyfyer(item) {
+  const selectedAccount = normalizePaymentAccount(item.activeAccount)
+  const quoteCount = normalizeAmount(item.realizedCommissions)
+  const pendingPaymentAmount = normalizeAmount(item.pendingPayments)
+  const paidAmount = normalizeAmount(item.paidCommissions)
+  const totalGeneratedAmount = normalizeAmount(item.totalCommissions)
+  const accountDataAvailable = Boolean(selectedAccount)
+
+  let statusLabel = 'Sin comisiones aprobadas'
+
+  if (pendingPaymentAmount > 0 && !accountDataAvailable) {
+    statusLabel = 'Falta cuenta bancaria'
+  } else if (pendingPaymentAmount > 0) {
+    statusLabel = 'Listo para nómina'
+  } else if (paidAmount > 0) {
+    statusLabel = 'Pagado'
+  }
+
+  return {
+    userId: item.idUser || '',
+    nombre: item.userFullname || 'No disponible',
+    email: normalizeOptionalValue(item.userEmail) || '',
+    selectedAccount,
+    quoteCount,
+    pendingPaymentAmount,
+    paidAmount,
+    totalGeneratedAmount,
+    accountDataAvailable,
+    statusLabel,
+    ownCommissions: normalizeAmount(item.ownCommissions),
+    referredCommissions: normalizeAmount(item.referredCommissions),
   }
 }
 
@@ -235,6 +280,17 @@ export const apiCommissionsRepository = {
           }))
         : [],
     }
+  },
+
+  async getMoneyfyers() {
+    const response = await apiClient.get('/api/v1/manager/moneyfyers')
+    const data = Array.isArray(response.data?.data)
+      ? response.data.data
+      : Array.isArray(response.data)
+        ? response.data
+        : []
+
+    return data.map(normalizeMoneyfyer)
   },
 
   async payQuotes(payload) {
