@@ -23,6 +23,14 @@ function normalizeMockDisplayStatus(backendStatus) {
   return 'Cotización incompleta'
 }
 
+function normalizeMockQuoteStatusFilter(status) {
+  if (!status || status === 'all') return undefined
+  if (status === 'Pendiente de aprobación') return 'Pendiente'
+  if (status === 'Pendiente de pago') return 'Aprobado'
+  if (status === 'Cotización incompleta') return undefined
+  return status
+}
+
 const MOCK_CONTRACT_BY_QUOTE_ID = Object.freeze({
   'Q-2026-1032': {
     transactionId: 'tx-mock-1032',
@@ -110,9 +118,12 @@ const MOCK_CONTRACT_BY_QUOTE_ID = Object.freeze({
 })
 
 export const mockCommissionsRepository = {
-  async list() {
+  async list(filters = {}) {
     await wait()
-    return structuredClone(mockCommissions).map((commission, index) => {
+    const requestedPage = Math.max(Number(filters.page || 0), 0)
+    const requestedSize = Math.max(Number(filters.size || 100), 1)
+    const backendStatusFilter = normalizeMockQuoteStatusFilter(filters.quoteStatus)
+    const normalizedItems = structuredClone(mockCommissions).map((commission, index) => {
       const backendContract = MOCK_CONTRACT_BY_QUOTE_ID[commission.idCotizacion] || {}
       const estadoBackend = backendContract.estadoBackend || commission.estado
 
@@ -127,6 +138,22 @@ export const mockCommissionsRepository = {
         userEmail: backendContract.userEmail || '',
       }
     })
+    const filteredItems = backendStatusFilter
+      ? normalizedItems.filter((item) => item.estadoBackend === backendStatusFilter)
+      : normalizedItems
+    const totalElements = filteredItems.length
+    const totalPages = Math.max(Math.ceil(totalElements / requestedSize), 1)
+    const page = Math.min(requestedPage, totalPages - 1)
+    const start = page * requestedSize
+    const items = filteredItems.slice(start, start + requestedSize)
+
+    return {
+      items,
+      page,
+      size: requestedSize,
+      totalElements,
+      totalPages,
+    }
   },
 
   async updateStatuses(updates) {

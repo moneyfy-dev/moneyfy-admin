@@ -13,7 +13,6 @@ const authStore = useAuthStore()
 const titles = {
   dashboard: 'Dashboard',
   commissions: 'Comisiones',
-  users: 'Usuarios',
 }
 
 const pageTitle = computed(() => titles[route.name] || 'Moneyfy Admin')

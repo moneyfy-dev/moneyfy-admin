@@ -3,13 +3,7 @@ import { defineStore } from 'pinia'
 import { commissionsRepository } from '../api/commissions.repository'
 import { toInputDate } from '../utils/commission-formatters'
 
-const DISPLAY_STATUS_BY_BACKEND_STATUS = Object.freeze({
-  Aprobado: 'Pendiente de pago',
-  Pagado: 'Pagado',
-  Conflictivo: 'Conflictivo',
-  Rechazado: 'Rechazado',
-  Caducado: 'Caducado',
-})
+const PAGE_SIZE_OPTIONS = Object.freeze([10, 25, 50, 100])
 
 function buildFinalizeQuotePayload(updates) {
   const updatesByUser = new Map()
@@ -348,6 +342,12 @@ export const useCommissionsStore = defineStore('commissions', () => {
     search: '',
     dateRange: createDefaultDateRange(),
   })
+  const pagination = reactive({
+    page: 0,
+    size: 25,
+    totalElements: 0,
+    totalPages: 1,
+  })
   const sorting = reactive({
     key: 'fecha',
     direction: 'desc',
@@ -400,6 +400,18 @@ export const useCommissionsStore = defineStore('commissions', () => {
   })
 
   const paymentPreparation = computed(() => collectPaymentGroups(filteredItems.value))
+  const pageSizeOptions = PAGE_SIZE_OPTIONS
+  const pageNumber = computed(() => pagination.page + 1)
+  const hasPreviousPage = computed(() => pagination.page > 0)
+  const hasNextPage = computed(() => pagination.page + 1 < pagination.totalPages)
+  const visibleRangeStart = computed(() => {
+    if (pagination.totalElements === 0 || items.value.length === 0) return 0
+    return pagination.page * pagination.size + 1
+  })
+  const visibleRangeEnd = computed(() => {
+    if (pagination.totalElements === 0 || items.value.length === 0) return 0
+    return pagination.page * pagination.size + items.value.length
+  })
 
   function scheduleImportSummaryClear() {
     if (importSummaryTimer) {
@@ -455,13 +467,35 @@ export const useCommissionsStore = defineStore('commissions', () => {
     return buildPaymentPreviewFromReport(report, filteredItems.value)
   }
 
-  async function fetchCommissions() {
+  async function fetchCommissions(options = {}) {
+    const requestedPage = Math.max(Number(options.page ?? pagination.page), 0)
+    const requestedSize = Math.max(Number(options.size ?? pagination.size), 1)
+
     loading.value = true
     error.value = ''
     clearAlerts()
 
     try {
-      items.value = await commissionsRepository.list()
+      const response = await commissionsRepository.list({
+        page: requestedPage,
+        size: requestedSize,
+        quoteStatus: filters.status,
+      })
+
+      items.value = Array.isArray(response.items) ? response.items : []
+      pagination.page = Math.max(Number(response.page ?? requestedPage), 0)
+      pagination.size = Math.max(Number(response.size ?? requestedSize), 1)
+      pagination.totalElements = Math.max(Number(response.totalElements || 0), 0)
+      pagination.totalPages = Math.max(Number(response.totalPages || 1), 1)
+
+      if (
+        pagination.totalElements > 0 &&
+        pagination.page >= pagination.totalPages &&
+        pagination.totalPages > 0
+      ) {
+        pagination.page = pagination.totalPages - 1
+        await fetchCommissions({ page: pagination.page, size: pagination.size })
+      }
     } catch (fetchError) {
       if (fetchError.status === 403) {
         error.value = 'La cuenta autenticada no tiene permisos para consultar las comisiones.'
@@ -475,6 +509,41 @@ export const useCommissionsStore = defineStore('commissions', () => {
     } finally {
       loading.value = false
     }
+  }
+
+  function setStatusFilter(status) {
+    filters.status = status
+    pagination.page = 0
+    fetchCommissions({ page: 0 })
+  }
+
+  function setPage(page) {
+    const normalizedPage = Math.max(Number(page), 0)
+    if (normalizedPage === pagination.page || normalizedPage >= pagination.totalPages) {
+      return
+    }
+
+    pagination.page = normalizedPage
+    fetchCommissions({ page: normalizedPage })
+  }
+
+  function nextPage() {
+    if (!hasNextPage.value) return
+    setPage(pagination.page + 1)
+  }
+
+  function previousPage() {
+    if (!hasPreviousPage.value) return
+    setPage(pagination.page - 1)
+  }
+
+  function setPageSize(size) {
+    const normalizedSize = Math.max(Number(size), 1)
+    if (normalizedSize === pagination.size) return
+
+    pagination.size = normalizedSize
+    pagination.page = 0
+    fetchCommissions({ page: 0, size: normalizedSize })
   }
 
   function setSort(key) {
@@ -572,14 +641,7 @@ export const useCommissionsStore = defineStore('commissions', () => {
       const submitted = result?.submitted !== false
 
       if (submitted) {
-        prepared.forEach(({ idCotizacion, estado }) => {
-          const commission = items.value.find((item) => item.idCotizacion === idCotizacion)
-          if (!commission) return
-
-          commission.estado = DISPLAY_STATUS_BY_BACKEND_STATUS[estado] || commission.estado
-          commission.estadoBackend = estado
-        })
-
+        await fetchCommissions({ page: pagination.page, size: pagination.size })
         await fetchMoneyfyers()
       }
 
@@ -664,31 +726,18 @@ export const useCommissionsStore = defineStore('commissions', () => {
       let conflictCount = 0
 
       if (submitted) {
-        const successfulGroups = submittableGroups
-
-        successfulGroups.forEach((group) => {
+        submittableGroups.forEach((group) => {
           const groupKey = `${group.userId}::${group.transactionIds.slice().sort().join('|')}`
-          if (failedGroups.has(groupKey)) {
-            return
+          if (failedGroups.has(groupKey)) return
+
+          if (group.status === 'Conflictivo') {
+            conflictCount += group.transactionIds.length
+          } else {
+            paidCount += group.transactionIds.length
           }
-
-          items.value.forEach((commission) => {
-            if (commission.userId !== group.userId) return
-            if (!group.transactionIds.includes(commission.transactionId)) return
-
-            const backendStatus = group.status === 'Conflictivo' ? 'Conflictivo' : 'Pagado'
-            commission.estado = DISPLAY_STATUS_BY_BACKEND_STATUS[backendStatus] || commission.estado
-            commission.estadoBackend = backendStatus
-            commission.paymentDate =
-              backendStatus === 'Pagado' ? new Date().toISOString().slice(0, 10) : ''
-            if (backendStatus === 'Conflictivo') {
-              conflictCount += 1
-            } else {
-              paidCount += 1
-            }
-          })
         })
 
+        await fetchCommissions({ page: pagination.page, size: pagination.size })
         await fetchMoneyfyers()
       }
 
@@ -719,6 +768,8 @@ export const useCommissionsStore = defineStore('commissions', () => {
     error,
     moneyfyersError,
     filters,
+    pagination,
+    pageSizeOptions,
     sorting,
     importSummary,
     pendingImport,
@@ -726,9 +777,19 @@ export const useCommissionsStore = defineStore('commissions', () => {
     pendingPayment,
     filteredItems,
     paymentPreparation,
+    pageNumber,
+    hasPreviousPage,
+    hasNextPage,
+    visibleRangeStart,
+    visibleRangeEnd,
     generatePaymentPreview,
     fetchCommissions,
     fetchMoneyfyers,
+    setStatusFilter,
+    setPage,
+    nextPage,
+    previousPage,
+    setPageSize,
     setSort,
     resetDateRange,
     clearPendingImport,

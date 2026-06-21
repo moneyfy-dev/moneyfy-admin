@@ -6,7 +6,6 @@ import RecoverPasswordPage from '@/features/auth/pages/RecoverPasswordPage.vue'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import DashboardPage from '@/features/dashboard/pages/DashboardPage.vue'
 import CommissionsPage from '@/features/commissions/pages/CommissionsPage.vue'
-import UsersPage from '@/features/users/pages/UsersPage.vue'
 
 const routes = [
   {
@@ -28,7 +27,6 @@ const routes = [
       { path: '', redirect: { name: 'dashboard' } },
       { path: 'dashboard', name: 'dashboard', component: DashboardPage },
       { path: 'comisiones', name: 'commissions', component: CommissionsPage },
-      { path: 'usuarios', name: 'users', component: UsersPage },
     ],
   },
   {

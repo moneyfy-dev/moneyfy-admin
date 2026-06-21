@@ -209,31 +209,36 @@ function normalizeMoneyfyer(item) {
   }
 }
 
+function normalizeQuoteStatusFilter(status) {
+  if (!status || status === 'all') return undefined
+  if (status === 'Pendiente de aprobación') return 'Pendiente'
+  if (status === 'Pendiente de pago') return 'Aprobado'
+  if (status === 'Cotización incompleta') return undefined
+  return status
+}
+
 export const apiCommissionsRepository = {
   async list(filters = {}) {
-    const pageSize = runtimeConfig.managerPageSize
-    const items = []
-    let page = 0
-    let totalPages = 1
+    const requestedPage = Math.max(Number(filters.page || 0), 0)
+    const requestedSize = Math.max(Number(filters.size || runtimeConfig.managerPageSize), 1)
+    const response = await apiClient.get('/api/v1/manager/dashboard/quotes', {
+      params: {
+        page: requestedPage,
+        size: requestedSize,
+        userId: filters.userId || undefined,
+        quoteStatus: normalizeQuoteStatusFilter(filters.quoteStatus),
+      },
+    })
+    const data = response.data?.data || {}
+    const content = Array.isArray(data.content) ? data.content : []
 
-    do {
-      const response = await apiClient.get('/api/v1/manager/dashboard/quotes', {
-        params: {
-          page,
-          size: pageSize,
-          userId: filters.userId || undefined,
-          quoteStatus: filters.quoteStatus || undefined,
-        },
-      })
-      const data = response.data?.data
-      const content = Array.isArray(data?.content) ? data.content : []
-
-      items.push(...content.map(normalizeCommission))
-      totalPages = Math.max(Number(data?.totalPages || 1), 1)
-      page += 1
-    } while (page < totalPages)
-
-    return items
+    return {
+      items: content.map(normalizeCommission),
+      page: Math.max(Number(data.page ?? requestedPage), 0),
+      size: Math.max(Number(data.size ?? requestedSize), 1),
+      totalElements: Math.max(Number(data.totalElements || 0), 0),
+      totalPages: Math.max(Number(data.totalPages || 1), 1),
+    }
   },
 
   async updateStatuses(payload) {

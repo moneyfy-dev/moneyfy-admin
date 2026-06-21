@@ -173,7 +173,7 @@ async function importPaymentFile(event) {
             :search="commissionsStore.filters.search"
             :date-from="commissionsStore.filters.dateRange.from"
             :date-to="commissionsStore.filters.dateRange.to"
-            @update:status="commissionsStore.filters.status = $event"
+            @update:status="commissionsStore.setStatusFilter($event)"
             @update:search="commissionsStore.filters.search = $event"
             @update:date-from="commissionsStore.filters.dateRange.from = $event"
             @update:date-to="commissionsStore.filters.dateRange.to = $event"
@@ -249,6 +249,57 @@ async function importPaymentFile(event) {
         :sort-direction="commissionsStore.sorting.direction"
         @sort="commissionsStore.setSort"
       />
+
+      <div
+        v-if="!commissionsStore.loading && !commissionsStore.error"
+        class="border-t border-slate-200 px-5 py-4"
+      >
+        <div class="flex flex-col gap-3 text-xs text-slate-500 lg:flex-row lg:items-center lg:justify-between">
+          <p>
+            Mostrando {{ commissionsStore.visibleRangeStart }}-{{ commissionsStore.visibleRangeEnd }}
+            de {{ commissionsStore.pagination.totalElements }} registros del backend.
+          </p>
+
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <label class="flex items-center gap-2">
+              <span>Filas por página</span>
+              <select
+                class="rounded-[8px] border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 outline-none transition focus:border-moneyfy-600"
+                :value="commissionsStore.pagination.size"
+                @change="commissionsStore.setPageSize(Number($event.target.value))"
+              >
+                <option
+                  v-for="size in commissionsStore.pageSizeOptions"
+                  :key="size"
+                  :value="size"
+                >
+                  {{ size }}
+                </option>
+              </select>
+            </label>
+
+            <div class="flex items-center gap-2">
+              <BaseButton
+                variant="ghost"
+                :disabled="!commissionsStore.hasPreviousPage"
+                @click="commissionsStore.previousPage()"
+              >
+                Anterior
+              </BaseButton>
+              <span class="min-w-24 text-center font-semibold text-slate-600">
+                Página {{ commissionsStore.pageNumber }} de {{ commissionsStore.pagination.totalPages }}
+              </span>
+              <BaseButton
+                variant="ghost"
+                :disabled="!commissionsStore.hasNextPage"
+                @click="commissionsStore.nextPage()"
+              >
+                Siguiente
+              </BaseButton>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <section class="admin-card overflow-hidden">

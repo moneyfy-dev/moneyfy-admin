@@ -10,7 +10,6 @@ defineEmits(['close'])
 const navigation = [
   { name: 'dashboard', label: 'Dashboard', icon: 'ri-dashboard-line' },
   { name: 'commissions', label: 'Comisiones', icon: 'ri-exchange-dollar-line' },
-  { name: 'users', label: 'Usuarios', icon: 'ri-user-settings-line' },
 ]
 </script>
 
