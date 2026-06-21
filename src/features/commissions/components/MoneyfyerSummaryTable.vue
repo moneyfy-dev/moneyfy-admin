@@ -49,8 +49,8 @@ function statusClass(statusLabel) {
   <EmptyState
     v-if="items.length === 0"
     icon="ri-user-shared-line"
-    title="No hay moneyfyers disponibles"
-    message="El backend no devolvio moneyfyers para este consolidado."
+    title="No hay registros disponibles"
+    message="No hay información para mostrar en este momento."
   />
 
   <div v-else class="overflow-x-auto">

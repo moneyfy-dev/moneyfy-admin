@@ -83,7 +83,7 @@ function getMutationErrorMessage(requestError, fallbackMessage) {
   }
 
   if (requestError.code === 'NETWORK_ERROR') {
-    return 'El navegador no pudo conectar con el endpoint administrativo. Revisa CORS, URL base o disponibilidad del backend.'
+    return 'No fue posible conectar con el servicio. Intenta nuevamente en unos minutos.'
   }
 
   return requestError.message || fallbackMessage
@@ -263,7 +263,7 @@ function buildPaymentPreviewFromReport(report, sourceItems) {
   const rejected = [
     ...invalidAccountRows.map((group) => ({
       reference: group.userId || 'N/A',
-      reason: `${group.nombre || 'No disponible'}: el backend no expuso una cuenta bancaria completa para este pago.`,
+      reason: `${group.nombre || 'No disponible'}: falta una cuenta bancaria completa para procesar este pago.`,
     })),
     ...conflicts.map((conflict) => ({
       reference: conflict.userId || 'N/A',
@@ -502,7 +502,7 @@ export const useCommissionsStore = defineStore('commissions', () => {
       } else if (fetchError.status === 401 || fetchError.status === 417) {
         error.value = 'La sesion administrativa expiro o ya no es valida. Ingresa nuevamente.'
       } else if (fetchError.code === 'NETWORK_ERROR') {
-        error.value = 'El navegador no pudo conectar con el endpoint administrativo. Revisa CORS, URL base o disponibilidad del backend.'
+        error.value = 'No fue posible conectar con el servicio. Intenta nuevamente en unos minutos.'
       } else {
         error.value = fetchError.message || 'No fue posible cargar las comisiones.'
       }
@@ -601,7 +601,7 @@ export const useCommissionsStore = defineStore('commissions', () => {
       if (commission.estadoBackend !== 'Pendiente') {
         localRejected.push({
           rowNumber,
-          reason: 'El backend solo permite finalizar cotizaciones Pendientes.',
+          reason: 'Solo es posible actualizar cotizaciones que aún están pendientes.',
         })
         return
       }

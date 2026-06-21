@@ -147,7 +147,7 @@ async function importPaymentFile(event) {
             />
             <CommissionActionCard
               title="Procesar pagos"
-              description="Envía la nómina validada al backend para cerrar el pago."
+              description="Procesa la nómina validada para cerrar pagos pendientes."
               icon="ri-bank-card-line"
               tone="green"
               @click="openPaymentReview"
@@ -185,7 +185,7 @@ async function importPaymentFile(event) {
             class="rounded-[8px] bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800"
             role="status"
           >
-            Hay {{ commissionsStore.paymentPreparation.missingAccountCount }} usuarios con comisiones aprobadas sin cuenta bancaria completa en los datos actuales. Puedes exportar la nomina, pero el procesamiento automatico de pagos seguira bloqueado hasta que backend exponga la cuenta seleccionada o ese dato se resuelva en el flujo server-side.
+            Hay {{ commissionsStore.paymentPreparation.missingAccountCount }} usuarios con comisiones aprobadas sin una cuenta bancaria completa. Puedes exportar la nómina, pero esos pagos no podrán procesarse hasta completar la información.
           </p>
 
           <p
@@ -200,8 +200,7 @@ async function importPaymentFile(event) {
             </template>
             <template v-else>
               {{ commissionsStore.importSummary.prepared }} actualizaciones validadas y preparadas,
-              {{ commissionsStore.importSummary.rejected }} rechazadas. No se enviaron al backend
-              porque el interruptor de escrituras administrativas sigue deshabilitado en este ambiente.
+              {{ commissionsStore.importSummary.rejected }} rechazadas. La operación no se procesó.
             </template>
           </p>
           <p
@@ -212,11 +211,11 @@ async function importPaymentFile(event) {
             <template v-if="commissionsStore.paymentSummary.submitted">
               {{ commissionsStore.paymentSummary.paid }} comisiones marcadas como pagadas,
               {{ commissionsStore.paymentSummary.conflicts }} filas marcadas como conflictivas,
-              {{ commissionsStore.paymentSummary.failed }} grupos rechazados por el backend y
+              {{ commissionsStore.paymentSummary.failed }} grupos no procesados y
               {{ commissionsStore.paymentSummary.rejected }} filas invalidadas antes del envio.
             </template>
             <template v-else>
-              No se enviaron pagos al backend porque el interruptor de escrituras administrativas sigue deshabilitado en este ambiente.
+              La nómina fue revisada, pero la operación no se procesó.
             </template>
           </p>
           <p
@@ -257,7 +256,7 @@ async function importPaymentFile(event) {
         <div class="flex flex-col gap-3 text-xs text-slate-500 lg:flex-row lg:items-center lg:justify-between">
           <p>
             Mostrando {{ commissionsStore.visibleRangeStart }}-{{ commissionsStore.visibleRangeEnd }}
-            de {{ commissionsStore.pagination.totalElements }} registros del backend.
+            de {{ commissionsStore.pagination.totalElements }} registros.
           </p>
 
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -312,10 +311,7 @@ async function importPaymentFile(event) {
 
       <div class="p-5">
         <p class="mb-3 text-xs text-slate-500">
-          Consolidado entregado por backend para revisar cuanto gana cada moneyfyer y preparar la nomina bancaria.
-        </p>
-        <p class="mb-4 text-[11px] text-slate-400">
-          Este bloque usa el endpoint dedicado <code>/api/v1/manager/moneyfyers</code> y no depende de los filtros de la tabla superior.
+          Resumen por moneyfyer para revisar comisiones acumuladas y estado de pago.
         </p>
         <div v-if="commissionsStore.moneyfyersLoading" class="space-y-3">
           <div v-for="index in 4" :key="index" class="h-12 animate-pulse rounded-[8px] bg-slate-100"></div>

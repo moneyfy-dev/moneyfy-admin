@@ -205,8 +205,7 @@ async function submitReset() {
 
           <div class="mt-5 rounded-[8px] border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600">
             <p class="leading-6">
-              Si el backend activa la cuenta durante este flujo, al confirmar quedaras autenticado
-              automaticamente en el admin.
+              Al confirmar el cambio, tu acceso quedará habilitado para continuar.
             </p>
             <RouterLink
               class="mt-3 inline-flex items-center gap-2 font-semibold text-moneyfy-700 transition hover:text-moneyfy-800"
