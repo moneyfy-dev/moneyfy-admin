@@ -90,16 +90,17 @@ function getMutationErrorMessage(requestError, fallbackMessage) {
 }
 
 function collectPaymentGroups(sourceItems) {
+  const eligibleStatuses = new Set(['Aprobado', 'Conflictivo'])
   const grouped = new Map()
   const rejected = []
-  let approvedCount = 0
+  let eligibleCount = 0
 
   sourceItems.forEach((commission) => {
-    if (commission.estadoBackend !== 'Aprobado') {
+    if (!eligibleStatuses.has(commission.estadoBackend)) {
       return
     }
 
-    approvedCount += 1
+    eligibleCount += 1
 
     if (!commission.userId) {
       rejected.push({
@@ -167,8 +168,8 @@ function collectPaymentGroups(sourceItems) {
   const missingAccountCount = prepared.length - processable.length
 
   return {
-    approvedCount,
-    hasApprovedRows: approvedCount > 0,
+    approvedCount: eligibleCount,
+    hasApprovedRows: eligibleCount > 0,
     accountDataAvailable: prepared.length > 0 && missingAccountCount === 0,
     missingAccountCount,
     prepared,
@@ -191,13 +192,14 @@ function getSubmittablePaymentGroups(preview) {
 }
 
 function buildPaymentPreviewFromReport(report, sourceItems) {
-  const approvedItems = sourceItems.filter((item) => item.estadoBackend === 'Aprobado')
+  const eligibleStatuses = new Set(['Aprobado', 'Conflictivo'])
+  const eligibleItems = sourceItems.filter((item) => eligibleStatuses.has(item.estadoBackend))
   const visibleTransactionIds = new Set(
-    approvedItems
+    eligibleItems
       .map((item) => item.transactionId)
       .filter(Boolean),
   )
-  const approvedByUser = approvedItems.reduce((map, item) => {
+  const eligibleByUser = eligibleItems.reduce((map, item) => {
     if (!map.has(item.userId)) {
       map.set(item.userId, [])
     }
@@ -212,14 +214,14 @@ function buildPaymentPreviewFromReport(report, sourceItems) {
 
   const groupedRows = backendPayload
     .map((group) => {
-      const userRows = approvedByUser.get(group.userId) || []
+      const userRows = eligibleByUser.get(group.userId) || []
       const payroll = payrollByUser.get(group.userId)
       const selectedAccount = group.userAccount || payroll?.userAccount || null
       const transactionIds = Array.isArray(group.transactions)
         ? group.transactions.filter((transactionId) => visibleTransactionIds.has(transactionId))
         : []
       const matchingQuotes = userRows.filter((item) => transactionIds.includes(item.transactionId))
-      const fallbackRow = userRows[0]
+      const fallbackRow = matchingQuotes[0] || userRows[0]
       const status = group.userTransactionStatus === 'Conflictivo' ? 'Conflictivo' : 'Pagado'
 
       if (transactionIds.length === 0) {
@@ -231,9 +233,8 @@ function buildPaymentPreviewFromReport(report, sourceItems) {
         nombre: fallbackRow?.nombre || 'No disponible',
         email: fallbackRow?.userEmail || selectedAccount?.email || '',
         totalComision:
-          matchingQuotes.length > 0
-            ? matchingQuotes.reduce((sum, item) => sum + Number(item.totalComision || 0), 0)
-            : Number(group.userPayment || payroll?.totalPayment || 0),
+          Number(group.userPayment || payroll?.totalPayment || 0) ||
+          matchingQuotes.reduce((sum, item) => sum + Number(item.totalComision || 0), 0),
         transactionIds,
         transactionCount: transactionIds.length,
         cotizaciones: matchingQuotes.map((item) => ({
@@ -255,30 +256,23 @@ function buildPaymentPreviewFromReport(report, sourceItems) {
     .filter(Boolean)
     .sort((first, second) => first.nombre.localeCompare(second.nombre, 'es'))
 
-  const invalidAccountRows = groupedRows.filter((group) => !group.accountDataAvailable)
   const actionableRows = groupedRows.filter((group) => group.accountDataAvailable)
   const prepared = actionableRows.filter((group) => group.status !== 'Conflictivo')
   const conflictRows = actionableRows.filter((group) => group.status === 'Conflictivo')
 
   const rejected = [
-    ...invalidAccountRows.map((group) => ({
-      reference: group.userId || 'N/A',
-      reason: `${group.nombre || 'No disponible'}: falta una cuenta bancaria completa para procesar este pago.`,
-    })),
     ...conflicts.map((conflict) => ({
       reference: conflict.userId || 'N/A',
       reason: `${conflict.userName || 'No disponible'}: ${conflict.message}`,
     })),
   ]
 
-  const missingAccountCount =
-    invalidAccountRows.length +
-    conflicts.filter((item) =>
+  const missingAccountCount = conflicts.filter((item) =>
       String(item.message || '').toLowerCase().includes('cuenta bancaria'),
     ).length
 
   return {
-    totalVisible: approvedItems.length,
+    totalVisible: eligibleItems.length,
     prepared,
     conflicts: conflictRows,
     rejected,
@@ -293,9 +287,9 @@ function buildPaymentPreviewFromReport(report, sourceItems) {
         userVoucher: group.voucher || null,
       })),
     },
-    accountDataAvailable: actionableRows.length > 0 && missingAccountCount === 0,
+    accountDataAvailable: missingAccountCount === 0,
     missingAccountCount,
-    hasApprovedRows: approvedItems.length > 0,
+    hasApprovedRows: eligibleItems.length > 0,
   }
 }
 

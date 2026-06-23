@@ -11,7 +11,7 @@ const route = useRoute()
 const router = useRouter()
 
 const form = reactive({
-  email: 'alejandro.osses.r@gmail.com',
+  email: String(route.query.email || ''),
   password: '',
 })
 
@@ -58,8 +58,8 @@ function openRecoveryFlow() {
             <div
               v-for="item in [
                 ['ri-shield-check-line', 'Acceso interno'],
-                ['ri-file-excel-2-line', 'CSV compatible'],
-                ['ri-bar-chart-box-line', 'Indicadores anuales'],
+                ['ri-file-excel-2-line', 'Excel operativo'],
+                ['ri-bar-chart-box-line', 'Indicadores clave'],
               ]"
               :key="item[1]"
               class="rounded-[8px] border border-white/10 bg-white/5 p-4"
@@ -85,6 +85,7 @@ function openRecoveryFlow() {
               label="Correo"
               type="email"
               autocomplete="email"
+              placeholder="Ingresa tu correo administrativo"
             />
             <BaseInput
               v-model="form.password"

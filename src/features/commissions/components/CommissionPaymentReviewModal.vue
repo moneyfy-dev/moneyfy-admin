@@ -104,12 +104,7 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="rounded-[8px] border border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-900">
-            Este archivo viene devuelto por el banco. Las filas con estado <strong>Pagado</strong> o <strong>Conflictivo</strong> se enviaran al contrato actual de
-            <code class="font-semibold">/api/v1/manager/pay-quotes</code>
-            usando el arreglo <code class="font-semibold">usersQuotes</code> con
-            <code class="font-semibold">userTransactionStatus</code>,
-            <code class="font-semibold">userNote</code> y
-            <code class="font-semibold">userVoucher</code>.
+            Revisa los pagos listos para procesar y los casos conflictivos antes de confirmar la nomina.
           </div>
 
           <div v-if="preview.prepared.length > 0" class="space-y-3">

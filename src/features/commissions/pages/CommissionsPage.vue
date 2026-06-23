@@ -181,14 +181,6 @@ async function importPaymentFile(event) {
           />
 
           <p
-            v-if="commissionsStore.paymentPreparation.hasApprovedRows && !commissionsStore.paymentPreparation.accountDataAvailable"
-            class="rounded-[8px] bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800"
-            role="status"
-          >
-            Hay {{ commissionsStore.paymentPreparation.missingAccountCount }} usuarios con comisiones aprobadas sin una cuenta bancaria completa. Puedes exportar la nómina, pero esos pagos no podrán procesarse hasta completar la información.
-          </p>
-
-          <p
             v-if="commissionsStore.importSummary"
             class="rounded-[8px] bg-moneyfy-50 px-3 py-2 text-xs font-medium text-moneyfy-700"
             role="status"

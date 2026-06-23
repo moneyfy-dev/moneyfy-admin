@@ -2,9 +2,9 @@ import { ApiError } from '@/services/api/errors'
 
 const DEMO_ADMIN = Object.freeze({
   managerId: 'admin-demo',
-  email: 'alejandro.osses.r@gmail.com',
-  name: 'Alejandro Osses',
-  surname: 'Moneyfy',
+  email: 'admin.demo@moneyfy.cl',
+  name: 'Admin',
+  surname: 'Demo',
   status: 'Activado',
 })
 
@@ -17,6 +17,7 @@ const DISABLED_ADMIN = Object.freeze({
 })
 
 const DEMO_PASSWORD = 'Moneyfy2026'
+const ROOT_ADMIN_EMAIL = 'root@moneyfy.cl'
 
 const wait = (milliseconds = 350) =>
   new Promise((resolve) => window.setTimeout(resolve, milliseconds))
@@ -53,7 +54,7 @@ export const mockAuthRepository = {
   async recoverPassword(email) {
     await wait()
 
-    if (String(email || '').toLowerCase() === 'root.moneyfyapp@gmail.com') {
+    if (String(email || '').toLowerCase() === ROOT_ADMIN_EMAIL) {
       throw new ApiError({
         status: 400,
         code: 'BAD_REQUEST',
@@ -69,7 +70,7 @@ export const mockAuthRepository = {
   async resendCode(email) {
     await wait()
 
-    if (String(email || '').toLowerCase() === 'root.moneyfyapp@gmail.com') {
+    if (String(email || '').toLowerCase() === ROOT_ADMIN_EMAIL) {
       throw new ApiError({
         status: 400,
         code: 'BAD_REQUEST',
@@ -87,7 +88,7 @@ export const mockAuthRepository = {
 
     const normalizedEmail = String(email || '').toLowerCase()
 
-    if (normalizedEmail === 'root.moneyfyapp@gmail.com') {
+    if (normalizedEmail === ROOT_ADMIN_EMAIL) {
       throw new ApiError({
         status: 400,
         code: 'BAD_REQUEST',

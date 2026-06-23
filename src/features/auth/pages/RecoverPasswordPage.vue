@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BaseButton from '@/components/atoms/BaseButton.vue'
 import BaseInput from '@/components/atoms/BaseInput.vue'
@@ -21,6 +21,29 @@ const showPassword = ref(false)
 const showRepeatedPassword = ref(false)
 const codeRequested = ref(false)
 const activeAction = ref('')
+const canRequestCode = computed(() => Boolean(form.email))
+const canResendCode = computed(() => Boolean(form.email && codeRequested.value))
+const canConfirmReset = computed(() =>
+  Boolean(
+    codeRequested.value &&
+    form.email &&
+    form.code &&
+    form.password &&
+    form.repeatedPassword,
+  ),
+)
+
+watch(
+  () => form.email,
+  (nextEmail, previousEmail) => {
+    if (nextEmail === previousEmail) return
+
+    codeRequested.value = false
+    form.code = ''
+    form.password = ''
+    form.repeatedPassword = ''
+  },
+)
 
 async function requestCode() {
   authStore.clearFeedback()
@@ -124,7 +147,7 @@ async function submitReset() {
                 type="button"
                 variant="ghost"
                 :loading="authStore.loading && activeAction === 'request'"
-                :disabled="!form.email"
+                :disabled="!canRequestCode"
                 @click="requestCode"
               >
                 <template #icon><i class="ri-mail-send-line text-lg"></i></template>
@@ -135,7 +158,7 @@ async function submitReset() {
                 type="button"
                 variant="ghost"
                 :loading="authStore.loading && activeAction === 'resend'"
-                :disabled="!form.email"
+                :disabled="!canResendCode"
                 @click="resendCode"
               >
                 <template #icon><i class="ri-refresh-line text-lg"></i></template>
@@ -143,32 +166,46 @@ async function submitReset() {
               </BaseButton>
             </div>
 
-            <BaseInput
-              v-model="form.code"
-              label="Codigo recibido"
-              autocomplete="one-time-code"
-              placeholder="Ingresa el codigo del correo"
-            />
-            <BaseInput
-              v-model="form.password"
-              label="Nueva contrasena"
-              :type="showPassword ? 'text' : 'password'"
-              autocomplete="new-password"
-              placeholder="Crea una contrasena nueva"
-              :trailing-icon="showPassword ? 'ri-eye-off-line' : 'ri-eye-line'"
-              :trailing-label="showPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'"
-              @trailing-click="showPassword = !showPassword"
-            />
-            <BaseInput
-              v-model="form.repeatedPassword"
-              label="Repite la contrasena"
-              :type="showRepeatedPassword ? 'text' : 'password'"
-              autocomplete="new-password"
-              placeholder="Repite la contrasena nueva"
-              :trailing-icon="showRepeatedPassword ? 'ri-eye-off-line' : 'ri-eye-line'"
-              :trailing-label="showRepeatedPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'"
-              @trailing-click="showRepeatedPassword = !showRepeatedPassword"
-            />
+            <div
+              v-if="codeRequested"
+              class="space-y-4 rounded-[8px] border border-slate-200 bg-slate-50 p-4"
+            >
+              <p class="text-xs font-medium leading-5 text-slate-600">
+                Ingresa el codigo recibido y define la nueva contrasena para completar el acceso.
+              </p>
+              <BaseInput
+                v-model="form.code"
+                label="Codigo recibido"
+                autocomplete="one-time-code"
+                placeholder="Ingresa el codigo del correo"
+              />
+              <BaseInput
+                v-model="form.password"
+                label="Nueva contrasena"
+                :type="showPassword ? 'text' : 'password'"
+                autocomplete="new-password"
+                placeholder="Crea una contrasena nueva"
+                :trailing-icon="showPassword ? 'ri-eye-off-line' : 'ri-eye-line'"
+                :trailing-label="showPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'"
+                @trailing-click="showPassword = !showPassword"
+              />
+              <BaseInput
+                v-model="form.repeatedPassword"
+                label="Repite la contrasena"
+                :type="showRepeatedPassword ? 'text' : 'password'"
+                autocomplete="new-password"
+                placeholder="Repite la contrasena nueva"
+                :trailing-icon="showRepeatedPassword ? 'ri-eye-off-line' : 'ri-eye-line'"
+                :trailing-label="showRepeatedPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'"
+                @trailing-click="showRepeatedPassword = !showRepeatedPassword"
+              />
+            </div>
+            <div
+              v-else
+              class="rounded-[8px] border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600"
+            >
+              Solicita el codigo de verificacion para habilitar el cambio de contrasena.
+            </div>
 
             <div
               v-if="authStore.error"
@@ -196,7 +233,7 @@ async function submitReset() {
               class="w-full"
               type="submit"
               :loading="authStore.loading && activeAction === 'confirm'"
-              :disabled="!form.email || !form.code || !form.password || !form.repeatedPassword"
+              :disabled="!canConfirmReset"
             >
               <template #icon><i class="ri-shield-keyhole-line text-lg"></i></template>
               Confirmar nueva contrasena
