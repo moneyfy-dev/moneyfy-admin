@@ -54,16 +54,17 @@ function statusClass(statusLabel) {
   />
 
   <div v-else class="overflow-x-auto">
-    <table class="w-full min-w-[1260px] table-fixed text-left text-[12px] leading-4">
+    <table class="w-full min-w-[1380px] table-fixed text-left text-[12px] leading-4">
       <colgroup>
-        <col class="w-[16%]" />
-        <col class="w-[16%]" />
-        <col class="w-[19%]" />
+        <col class="w-[15%]" />
+        <col class="w-[15%]" />
+        <col class="w-[18%]" />
+        <col class="w-[8%]" />
+        <col class="w-[9%]" />
         <col class="w-[9%]" />
         <col class="w-[10%]" />
-        <col class="w-[10%]" />
-        <col class="w-[10%]" />
-        <col class="w-[10%]" />
+        <col class="w-[8%]" />
+        <col class="w-[8%]" />
       </colgroup>
       <thead class="bg-slate-50 text-[12px] uppercase text-slate-500">
         <tr>
@@ -73,6 +74,7 @@ function statusClass(statusLabel) {
           <th class="px-3 py-2.5 font-bold">Cotizaciones</th>
           <th class="px-3 py-2.5 font-bold">Pend. pago</th>
           <th class="px-3 py-2.5 font-bold">Pagado</th>
+          <th class="px-3 py-2.5 font-bold">Generado propio</th>
           <th class="px-3 py-2.5 font-bold">Generado por referidos</th>
           <th class="px-3 py-2.5 font-bold">Total generado</th>
         </tr>
@@ -104,6 +106,9 @@ function statusClass(statusLabel) {
           </td>
           <td class="px-3 py-3 align-top font-semibold text-sky-700">
             {{ formatCurrency(item.paidAmount) }}
+          </td>
+          <td class="px-3 py-3 align-top font-semibold text-emerald-700">
+            {{ formatCurrency(item.ownCommissions) }}
           </td>
           <td class="px-3 py-3 align-top font-semibold text-violet-700">
             {{ formatCurrency(item.referredCommissions) }}
