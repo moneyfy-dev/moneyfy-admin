@@ -115,7 +115,7 @@ async function importPaymentFile(event) {
             <div>
               <h2 class="text-lg font-bold">Tabla de comisiones</h2>
               <p class="mt-1 text-xs text-slate-500">
-                Filtra, ordena y exporta exactamente los registros visibles.
+                Exporta las cotizaciones pendientes visibles para gestionar estados con las aseguradoras.
               </p>
             </div>
 

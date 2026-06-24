@@ -306,6 +306,17 @@ function buildPaymentPreviewFromExcelImport(imported) {
   }
 }
 
+function compareImportRows(first, second) {
+  const firstOrder = Number(first?.rowOrder)
+  const secondOrder = Number(second?.rowOrder)
+
+  if (Number.isFinite(firstOrder) && Number.isFinite(secondOrder)) {
+    return firstOrder - secondOrder
+  }
+
+  return String(first?.rowNumber || '').localeCompare(String(second?.rowNumber || ''), 'es')
+}
+
 function createDefaultDateRange() {
   const today = new Date()
   const twoMonthsAgo = new Date(today)
@@ -575,12 +586,13 @@ export const useCommissionsStore = defineStore('commissions', () => {
     const prepared = []
     const localRejected = [...rejected]
 
-    valid.forEach(({ rowNumber, idCotizacion, estado }) => {
+    valid.forEach(({ rowNumber, rowOrder, idCotizacion, estado }) => {
       const commission = items.value.find((item) => item.idCotizacion === idCotizacion)
 
       if (!commission) {
         localRejected.push({
           rowNumber,
+          rowOrder,
           reason: 'La cotizacion no existe en los datos cargados.',
         })
         return
@@ -588,6 +600,7 @@ export const useCommissionsStore = defineStore('commissions', () => {
       if (!commission.userId) {
         localRejected.push({
           rowNumber,
+          rowOrder,
           reason: 'La cotizacion no tiene un usuario asociado.',
         })
         return
@@ -602,6 +615,7 @@ export const useCommissionsStore = defineStore('commissions', () => {
 
       prepared.push({
         rowNumber,
+        rowOrder,
         userId: commission.userId,
         idCotizacion,
         estado,
@@ -615,8 +629,8 @@ export const useCommissionsStore = defineStore('commissions', () => {
 
     pendingImport.value = {
       total,
-      prepared,
-      rejected: localRejected.sort((first, second) => first.rowNumber - second.rowNumber),
+      prepared: prepared.sort(compareImportRows),
+      rejected: localRejected.sort(compareImportRows),
       payload,
     }
   }

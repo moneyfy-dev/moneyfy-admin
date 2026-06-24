@@ -163,6 +163,7 @@ function normalizeCommission(row) {
     anioVehiculo: normalizeOptionalValue(row.quoterCarYear),
     tipoVehiculo: normalizeOptionalValue(row.quoterCarType),
     estado: normalizeUiStatus(backendStatus, quoteStatus),
+    estadoActual: normalizeUiStatus(backendStatus, quoteStatus),
     estadoBackend: backendStatus,
     fecha: normalizeDate(row.inicialDate),
     compania: normalizeOptionalValue(row.quoterPlanInsurer),

@@ -18,7 +18,7 @@ export const BACKEND_UPDATE_STATUSES = Object.freeze([
 
 export const COMMISSION_COLUMNS = Object.freeze([
   ['fecha', 'Fecha cotizacion'],
-  ['estado', 'Estado'],
+  ['estadoActual', 'Estado actual'],
   ['compania', 'Aseguradora'],
   ['idCotizacion', 'ID cotizacion'],
   ['transactionId', 'ID transaccion'],
