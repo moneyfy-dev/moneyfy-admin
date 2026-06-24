@@ -149,25 +149,40 @@ function normalizeCommission(row) {
   const transactionStatus = normalizeOptionalValue(row.transactionStatus)
   const quoteStatus = normalizeOptionalValue(row.quoteStatus)
   const backendStatus = resolveBackendStatus(transactionStatus, quoteStatus)
+  const buyerName = normalizeOptionalValue(row.quoterBuyerFullname)
+  const beneficiaryName = normalizeOptionalValue(row.userFullname)
 
   return {
     userId: row.idUser || '',
     idCotizacion: row.quoteId || '',
-    nombre: row.quoterBuyerFullname && row.quoterBuyerFullname !== 'N/A'
-      ? row.quoterBuyerFullname
-      : row.userFullname || 'No disponible',
+    nombre: buyerName || beneficiaryName || 'No disponible',
+    beneficiario: beneficiaryName || 'No disponible',
     patente: row.quoterCarPpu === 'N/A' ? '' : row.quoterCarPpu || '',
+    marcaVehiculo: normalizeOptionalValue(row.quoterCarBrand),
+    modeloVehiculo: normalizeOptionalValue(row.quoterCarModel),
+    anioVehiculo: normalizeOptionalValue(row.quoterCarYear),
+    tipoVehiculo: normalizeOptionalValue(row.quoterCarType),
     estado: normalizeUiStatus(backendStatus, quoteStatus),
     estadoBackend: backendStatus,
     fecha: normalizeDate(row.inicialDate),
     compania: normalizeOptionalValue(row.quoterPlanInsurer),
     totalComision: normalizeAmount(row.transactionTotalCommission),
     nombrePlan: normalizeOptionalValue(row.quoterPlanName),
+    rutDueno: normalizeOptionalValue(row.quoterOwnerPersonalId),
+    nombreDueno: normalizeOptionalValue(row.quoterOwnerFullname),
+    rutComprador: normalizeOptionalValue(row.quoterBuyerPersonalId),
+    nombreComprador: buyerName,
+    emailComprador: normalizeOptionalValue(row.quoterBuyerEmail),
+    telefonoComprador: normalizeOptionalValue(row.quoterBuyerPhone),
+    calle: normalizeOptionalValue(row.quoterAddressStreet),
+    numeroDireccion: normalizeOptionalValue(row.quoterAddressStreetNumber),
     transactionId: normalizeOptionalValue(row.transactionId),
     transactionStatus,
     commissionStatus: normalizeOptionalValue(row.commissionStatus),
     approvalDate: normalizeDate(row.approvalDate),
     paymentDate: normalizeDate(row.paymentDate),
+    fechaAprobacion: normalizeDate(row.approvalDate),
+    fechaPago: normalizeDate(row.paymentDate),
     userEmail: normalizeOptionalValue(row.userEmail),
     selectedAccount: normalizePaymentAccount(
       row.selectedAccount || row.userSelectedAccount || row.userAccount || row.account,

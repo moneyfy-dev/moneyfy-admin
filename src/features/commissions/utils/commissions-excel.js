@@ -3,10 +3,15 @@ import {
   COMMISSION_COLUMNS,
 } from '../constants'
 
-const DETAILS_SHEET = 'Comisiones'
+const DETAILS_SHEET = 'Resumen Comisiones'
 const UPDATES_SHEET = 'Actualizacion estados'
 const CATALOG_SHEET = 'Catalogos'
 const UPDATE_HEADERS = ['idCotizacion', 'estado']
+const INSURER_BUCKETS = Object.freeze([
+  { key: 'BCI', sheetName: 'BCI' },
+  { key: 'FDI', sheetName: 'FDI' },
+  { key: 'OTRAS', sheetName: 'Otras companias' },
+])
 
 async function createWorkbook() {
   const { default: ExcelJS } = await import('exceljs')
@@ -46,23 +51,37 @@ function styleHeader(row) {
   })
 }
 
-function addDetailsSheet(workbook, commissions) {
-  const worksheet = workbook.addWorksheet(DETAILS_SHEET, {
+function getColumnWidth(key) {
+  if (['idCotizacion', 'transactionId'].includes(key)) return 30
+  if (['beneficiario', 'nombreDueno', 'nombreComprador', 'nombrePlan', 'userEmail', 'emailComprador'].includes(key)) {
+    return 28
+  }
+  if (['calle'].includes(key)) return 24
+  if (['compania'].includes(key)) return 22
+  if (['telefonoComprador', 'rutDueno', 'rutComprador', 'patente'].includes(key)) return 18
+  if (['fecha', 'fechaAprobacion', 'fechaPago', 'anioVehiculo', 'tipoVehiculo'].includes(key)) return 16
+  return 20
+}
+
+function buildCommissionExportRow(commission) {
+  return Object.fromEntries(
+    COMMISSION_COLUMNS.map(([key]) => [key, commission[key] ?? '']),
+  )
+}
+
+function createDetailsSheet(workbook, sheetName, commissions) {
+  const worksheet = workbook.addWorksheet(sheetName, {
     views: [{ state: 'frozen', ySplit: 1 }],
   })
 
   worksheet.columns = COMMISSION_COLUMNS.map(([key, label]) => ({
     key,
     header: label,
-    width: key === 'idCotizacion' || key === 'nombrePlan' ? 28 : 20,
+    width: getColumnWidth(key),
   }))
 
   commissions.forEach((commission) => {
-    worksheet.addRow(
-      Object.fromEntries(
-        COMMISSION_COLUMNS.map(([key]) => [key, commission[key] ?? '']),
-      ),
-    )
+    worksheet.addRow(buildCommissionExportRow(commission))
   })
 
   styleHeader(worksheet.getRow(1))
@@ -71,6 +90,30 @@ function addDetailsSheet(workbook, commissions) {
     to: { row: Math.max(worksheet.rowCount, 1), column: COMMISSION_COLUMNS.length },
   }
   worksheet.getColumn('totalComision').numFmt = '$#,##0'
+
+  return worksheet
+}
+
+function normalizeInsurerBucket(compania) {
+  const normalized = String(compania || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+
+  if (normalized.includes('bci')) return 'BCI'
+  if (normalized.includes('fdi')) return 'FDI'
+  return 'OTRAS'
+}
+
+function addInsurerSheets(workbook, commissions) {
+  INSURER_BUCKETS.forEach(({ key, sheetName }) => {
+    const filtered = commissions.filter(
+      (commission) => normalizeInsurerBucket(commission.compania) === key,
+    )
+
+    createDetailsSheet(workbook, sheetName, filtered)
+  })
 }
 
 function addUpdatesSheet(workbook, commissions) {
@@ -85,10 +128,10 @@ function addUpdatesSheet(workbook, commissions) {
   commissions
     .filter((commission) => commission.estadoBackend === 'Pendiente')
     .forEach((commission) => {
-    worksheet.addRow({
-      idCotizacion: commission.idCotizacion,
-      estado: '',
-    })
+      worksheet.addRow({
+        idCotizacion: commission.idCotizacion,
+        estado: '',
+      })
     })
 
   styleHeader(worksheet.getRow(1))
@@ -123,9 +166,11 @@ export async function exportCommissionsExcel(commissions) {
   workbook.creator = 'Moneyfy Admin'
   workbook.created = new Date()
 
+  createDetailsSheet(workbook, DETAILS_SHEET, commissions)
+  addInsurerSheets(workbook, commissions)
   addUpdatesSheet(workbook, commissions)
-  addDetailsSheet(workbook, commissions)
   addCatalogSheet(workbook)
+  workbook.views = [{ activeTab: 0 }]
 
   const buffer = await workbook.xlsx.writeBuffer()
   const blob = new Blob([buffer], {
