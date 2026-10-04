@@ -19,6 +19,8 @@ const commissionsStore = useCommissionsStore()
 const fileInput = ref(null)
 const paymentFileInput = ref(null)
 const fileError = ref('')
+const isExporting = ref(false)
+const isImporting = ref(false)
 
 onMounted(() => {
   if (commissionsStore.items.length === 0) {
@@ -37,13 +39,18 @@ function openPaymentReview() {
 }
 
 async function exportRows() {
+  if (isExporting.value || isImporting.value) return
+  isExporting.value = true
   fileError.value = ''
   commissionsStore.clearAlerts()
 
   try {
-    await exportCommissionsExcel(commissionsStore.filteredItems)
+    const pendingQuotes = await commissionsStore.fetchPendingQuotesExport()
+    await exportCommissionsExcel(pendingQuotes)
   } catch (error) {
     fileError.value = error.message || 'No fue posible generar el archivo Excel.'
+  } finally {
+    isExporting.value = false
   }
 }
 
@@ -65,9 +72,11 @@ async function exportPaymentPayroll() {
 
 async function importFile(event) {
   const file = event.target.files?.[0]
-  if (!file) return
+  if (!file || isImporting.value || isExporting.value) return
 
+  isImporting.value = true
   fileError.value = ''
+  commissionsStore.clearPendingImport()
   commissionsStore.clearImportSummary()
 
   try {
@@ -76,10 +85,11 @@ async function importFile(event) {
     }
 
     const result = await parseCommissionStatusExcel(file)
-    commissionsStore.prepareStatusImport(result)
+    await commissionsStore.prepareStatusImport(result)
   } catch (error) {
     fileError.value = error.message || 'No fue posible procesar el archivo.'
   } finally {
+    isImporting.value = false
     event.target.value = ''
   }
 }
@@ -115,7 +125,8 @@ async function importPaymentFile(event) {
             <div>
               <h2 class="text-lg font-bold">Tabla de comisiones</h2>
               <p class="mt-1 text-xs text-slate-500">
-                Exporta las cotizaciones pendientes visibles para gestionar estados con las aseguradoras.
+                Exporta e importa todas las cotizaciones pendientes del historial, agrupadas por aseguradora.
+                Los filtros de fecha, búsqueda y página de la tabla no limitan estas operaciones.
               </p>
             </div>
 
@@ -123,18 +134,21 @@ async function importPaymentFile(event) {
 
           <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <CommissionActionCard
-              title="Exportar Excel"
-              description="Descarga las cotizaciones visibles con sus estados actuales."
+              :title="isExporting ? 'Preparando Excel…' : 'Exportar Excel'"
+              description="Descarga todas las pendientes del historial para cada aseguradora, sin filtros de la tabla."
               icon="ri-download-2-line"
               tone="light"
-              :disabled="commissionsStore.filteredItems.length === 0"
+              :disabled="commissionsStore.loading || isExporting || isImporting"
+              :aria-busy="isExporting"
               @click="exportRows"
             />
             <CommissionActionCard
-              title="Cargar estados"
-              description="Importa el Excel de respuesta para aprobar, rechazar o caducar."
+              :title="isImporting ? 'Validando Excel…' : 'Cargar estados'"
+              description="Valida la respuesta contra todas las pendientes y confirma antes de aprobar, rechazar o caducar."
               icon="ri-upload-2-line"
               tone="dark"
+              :disabled="commissionsStore.loading || isImporting || isExporting"
+              :aria-busy="isImporting"
               @click="fileInput?.click()"
             />
             <CommissionActionCard
@@ -180,15 +194,24 @@ async function importPaymentFile(event) {
             @reset-date-range="commissionsStore.resetDateRange"
           />
 
+          <div class="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+            <BaseButton variant="ghost" :disabled="commissionsStore.loading" @click="commissionsStore.showAllHistory()">Todo el historial</BaseButton>
+            <span>El rango inicial de la tabla es de 2 meses. Limpia las fechas para ver cotizaciones anteriores.</span>
+          </div>
+
           <p
             v-if="commissionsStore.importSummary"
-            class="rounded-[8px] bg-moneyfy-50 px-3 py-2 text-xs font-medium text-moneyfy-700"
+            class="rounded-[8px] px-3 py-2 text-xs font-medium"
+            :class="commissionsStore.importSummary.rejected || commissionsStore.importSummary.unconfirmed ? 'bg-amber-50 text-amber-800' : 'bg-moneyfy-50 text-moneyfy-700'"
             role="status"
           >
             <template v-if="commissionsStore.importSummary.submitted">
-              {{ commissionsStore.importSummary.updated }} actualizadas,
+              {{ commissionsStore.importSummary.updated }} actualizadas confirmadas,
               {{ commissionsStore.importSummary.rejected }} rechazadas de
-              {{ commissionsStore.importSummary.total }} filas procesadas.
+              {{ commissionsStore.importSummary.total }} filas enviadas.
+              {{ commissionsStore.importSummary.unconfirmed }} sin confirmar.
+              <span v-if="commissionsStore.importSummary.rejectedIds.length"> Revisa las rechazadas: {{ commissionsStore.importSummary.rejectedIds.slice(0, 8).join(', ') }}.</span>
+              <span v-if="commissionsStore.importSummary.unconfirmedIds.length"> Revisa antes de reenviar: {{ commissionsStore.importSummary.unconfirmedIds.slice(0, 8).join(', ') }}.</span>
             </template>
             <template v-else>
               {{ commissionsStore.importSummary.prepared }} actualizaciones validadas y preparadas,

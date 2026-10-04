@@ -1,9 +1,9 @@
 import { apiClient } from '@/services/api/client'
 import { runtimeConfig } from '@/config/runtime'
 import { moneyfyerAmounts } from '../utils/moneyfyer-summary'
+import { createPendingQuotesRepository, safeStatusMutationError } from './pending-quotes-contract.js'
 
 const INCOMPLETE_QUOTE_STATUSES = new Set(['Iniciando', 'Cotizando', 'Recopilando'])
-
 function normalizeDate(value) {
   if (!value || value === 'N/A') return ''
   return String(value).slice(0, 10)
@@ -251,8 +251,12 @@ export const apiCommissionsRepository = {
       }
     }
 
-    const response = await apiClient.put('/api/v1/manager/finalize/quote', payload)
-    return response.data?.data || response.data
+    try {
+      const response = await apiClient.put('/api/v1/manager/finalize/quote', payload)
+      return response.data?.data || response.data
+    } catch (error) {
+      throw safeStatusMutationError(error)
+    }
   },
 
   async generatePaymentReport(payload) {
@@ -298,6 +302,10 @@ export const apiCommissionsRepository = {
         : []
 
     return data.map(normalizeMoneyfyer)
+  },
+
+  async getPendingQuotes() {
+    return createPendingQuotesRepository(apiClient).getPendingQuotes()
   },
 
   async payQuotes(payload) {

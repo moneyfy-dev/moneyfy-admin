@@ -2,30 +2,9 @@ import { computed, reactive, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { commissionsRepository } from '../api/commissions.repository'
 import { toInputDate } from '../utils/commission-formatters'
+import { validatePendingQuotesExport, buildStatusImportPreview, summarizeStatusImportResult } from '../api/pending-quotes-contract.js'
 
 const PAGE_SIZE_OPTIONS = Object.freeze([10, 25, 50, 100])
-
-function buildFinalizeQuotePayload(updates) {
-  const updatesByUser = new Map()
-
-  updates.forEach(({ userId, idCotizacion, estado }) => {
-    if (!updatesByUser.has(userId)) {
-      updatesByUser.set(userId, [])
-    }
-
-    updatesByUser.get(userId).push({
-      quoterId: idCotizacion,
-      transactionStatus: estado,
-    })
-  })
-
-  return {
-    usersQuotes: Array.from(updatesByUser, ([userId, quotes]) => ({
-      userId,
-      quotes,
-    })),
-  }
-}
 
 function buildPayQuotesPayload(groups) {
   return {
@@ -306,17 +285,6 @@ function buildPaymentPreviewFromExcelImport(imported) {
   }
 }
 
-function compareImportRows(first, second) {
-  const firstOrder = Number(first?.rowOrder)
-  const secondOrder = Number(second?.rowOrder)
-
-  if (Number.isFinite(firstOrder) && Number.isFinite(secondOrder)) {
-    return firstOrder - secondOrder
-  }
-
-  return String(first?.rowNumber || '').localeCompare(String(second?.rowNumber || ''), 'es')
-}
-
 function createDefaultDateRange() {
   const today = new Date()
   const twoMonthsAgo = new Date(today)
@@ -329,6 +297,7 @@ function createDefaultDateRange() {
 }
 
 export const useCommissionsStore = defineStore('commissions', () => {
+  let importSubmissionInFlight = false
   let importSummaryTimer = null
   let paymentSummaryTimer = null
 
@@ -472,6 +441,10 @@ export const useCommissionsStore = defineStore('commissions', () => {
     return buildPaymentPreviewFromReport(report, filteredItems.value)
   }
 
+  async function fetchPendingQuotesExport() {
+    return validatePendingQuotesExport(await commissionsRepository.getPendingQuotes())
+  }
+
   async function fetchCommissions(options = {}) {
     const requestedPage = Math.max(Number(options.page ?? pagination.page), 0)
     const requestedSize = Math.max(Number(options.size ?? pagination.size), 1)
@@ -565,6 +538,12 @@ export const useCommissionsStore = defineStore('commissions', () => {
     Object.assign(filters.dateRange, createDefaultDateRange())
   }
 
+  function showAllHistory() {
+    Object.assign(filters.dateRange, { from: '', to: '' })
+    pagination.page = 0
+    return fetchCommissions({ page: 0 })
+  }
+
   function clearPendingImport() {
     pendingImport.value = null
   }
@@ -579,75 +558,29 @@ export const useCommissionsStore = defineStore('commissions', () => {
     pendingPayment.value = buildPaymentPreviewFromExcelImport(imported)
   }
 
-  function prepareStatusImport({ valid, rejected, total }) {
+  async function prepareStatusImport(imported) {
     error.value = ''
     clearImportSummary()
-
-    const prepared = []
-    const localRejected = [...rejected]
-
-    valid.forEach(({ rowNumber, rowOrder, idCotizacion, estado }) => {
-      const commission = items.value.find((item) => item.idCotizacion === idCotizacion)
-
-      if (!commission) {
-        localRejected.push({
-          rowNumber,
-          rowOrder,
-          reason: 'La cotizacion no existe en los datos cargados.',
-        })
-        return
-      }
-      if (!commission.userId) {
-        localRejected.push({
-          rowNumber,
-          rowOrder,
-          reason: 'La cotizacion no tiene un usuario asociado.',
-        })
-        return
-      }
-      if (commission.estadoBackend !== 'Pendiente') {
-        localRejected.push({
-          rowNumber,
-          reason: 'Solo es posible actualizar cotizaciones que aún están pendientes.',
-        })
-        return
-      }
-
-      prepared.push({
-        rowNumber,
-        rowOrder,
-        userId: commission.userId,
-        idCotizacion,
-        estado,
-        nombre: commission.nombre,
-        compania: commission.compania,
-        estadoActual: commission.estado,
-      })
-    })
-
-    const payload = buildFinalizeQuotePayload(prepared)
-
-    pendingImport.value = {
-      total,
-      prepared: prepared.sort(compareImportRows),
-      rejected: localRejected.sort(compareImportRows),
-      payload,
-    }
+    pendingImport.value = null
+    pendingImport.value = buildStatusImportPreview(imported, await fetchPendingQuotesExport())
   }
 
   async function submitPendingImport() {
-    if (!pendingImport.value) return
+    if (!pendingImport.value || importSubmissionInFlight) return
+    importSubmissionInFlight = true
 
     loading.value = true
     error.value = ''
 
     try {
-      const { prepared, rejected, total, payload } = pendingImport.value
+      const freshPreview = buildStatusImportPreview({ valid: pendingImport.value.prepared, rejected: [], total: pendingImport.value.total }, await fetchPendingQuotesExport())
+      const { prepared, total, payload } = freshPreview
       const result = prepared.length > 0
         ? await commissionsRepository.updateStatuses(payload)
         : { submitted: false }
       const submitted = result?.submitted !== false
 
+      pendingImport.value = null
       if (submitted) {
         await fetchCommissions({ page: pagination.page, size: pagination.size })
         await fetchMoneyfyers()
@@ -656,17 +589,18 @@ export const useCommissionsStore = defineStore('commissions', () => {
       importSummary.value = {
         total,
         prepared: prepared.length,
-        updated: submitted ? prepared.length : 0,
-        rejected: rejected.length,
+        ...(submitted ? summarizeStatusImportResult(result, prepared) : { updated: 0, rejected: 0, unconfirmed: 0, rejectedIds: [], unconfirmedIds: [] }),
         submitted,
         payload,
       }
-      scheduleImportSummaryClear()
+      if (!importSummary.value.rejected && !importSummary.value.unconfirmed) scheduleImportSummaryClear()
 
       pendingImport.value = null
     } catch (importError) {
+      pendingImport.value = null
       error.value = getMutationErrorMessage(importError, 'No fue posible actualizar las comisiones.')
     } finally {
+      importSubmissionInFlight = false
       loading.value = false
     }
   }
@@ -791,6 +725,7 @@ export const useCommissionsStore = defineStore('commissions', () => {
     visibleRangeStart,
     visibleRangeEnd,
     generatePaymentPreview,
+    fetchPendingQuotesExport,
     fetchCommissions,
     fetchMoneyfyers,
     setStatusFilter,
@@ -800,6 +735,7 @@ export const useCommissionsStore = defineStore('commissions', () => {
     setPageSize,
     setSort,
     resetDateRange,
+    showAllHistory,
     clearPendingImport,
     clearPendingPayment,
     clearImportSummary,
