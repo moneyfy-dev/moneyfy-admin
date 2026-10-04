@@ -105,8 +105,10 @@ function statusClass(status) {
             <div class="rounded-xl bg-emerald-50 p-4"><dt class="text-sm text-slate-600">Generado propio</dt><dd class="mt-2 text-xl font-bold text-emerald-700">{{ formatCurrency(selectedItem.ownCommissions) }}</dd></div>
             <div class="rounded-xl bg-violet-50 p-4"><dt class="text-sm text-slate-600">Generado por referidos</dt><dd class="mt-2 text-xl font-bold text-violet-700">{{ formatCurrency(selectedItem.referredCommissions) }}</dd></div>
             <div class="rounded-xl bg-moneyfy-50 p-4"><dt class="text-sm text-slate-600">Total generado</dt><dd class="mt-2 text-xl font-bold text-moneyfy-700">{{ formatCurrency(selectedItem.totalGeneratedAmount) }}</dd></div>
+            <div class="rounded-xl bg-amber-50 p-4"><dt class="text-sm text-slate-600">Por aprobar</dt><dd class="mt-2 text-xl font-bold text-amber-700">{{ formatCurrency(selectedItem.pendingApprovalAmount) }}</dd></div>
+            <div class="rounded-xl bg-orange-50 p-4"><dt class="text-sm text-slate-600">Conflictivas</dt><dd class="mt-2 text-xl font-bold text-orange-700">{{ formatCurrency(selectedItem.conflictAmount) }}</dd></div>
           </dl>
-          <p class="mt-5 text-sm leading-6 text-slate-600">Pend. pago incluye comisiones con estado Aprobado o Conflictivo. Los importes generados incluyen esas comisiones y las pagadas; excluyen las pendientes de aprobación. Cotizaciones cuenta las comisiones recibidas, incluidas las originadas por referidos.</p>
+          <p class="mt-5 text-sm leading-6 text-slate-600">Pend. pago incluye únicamente comisiones Aprobado. Los importes generados incluyen Aprobado, Pagado y Conflictivo; una comisión conflictiva corresponde a un pago fallido de una comisión aprobada. Por aprobar (Pendiente) y Conflictivas se muestran por separado. Cotizaciones cuenta las comisiones recibidas, incluidas las originadas por referidos. Este consolidado corresponde a todo el historial.</p>
           <div class="mt-6 border-t border-slate-100 pt-4"><p class="break-words text-sm text-slate-700">{{ accountLabel(selectedItem) }}</p><p class="mt-1 text-sm text-slate-500">{{ selectedItem.selectedAccount?.holderName || 'Titular no disponible' }}</p></div>
           <div class="mt-6 flex justify-end"><button type="button" class="btn-primary" @click="closeDetail">Cerrar</button></div>
         </div>

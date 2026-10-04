@@ -39,6 +39,7 @@ defineProps({
       <span class="text-xs font-semibold uppercase text-slate-400">{{ eyebrow }}</span>
     </div>
     <p class="mt-5 text-xs text-slate-500">{{ label }}</p>
-    <p class="mt-1 text-3xl font-bold">{{ value }}</p>
+    <p class="mt-1 break-words text-3xl font-bold">{{ value }}</p>
+    <div v-if="$slots.default" class="mt-5"><slot /></div>
   </article>
 </template>

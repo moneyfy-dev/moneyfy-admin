@@ -1,5 +1,6 @@
 import { apiClient } from '@/services/api/client'
 import { runtimeConfig } from '@/config/runtime'
+import { moneyfyerAmounts } from '../utils/moneyfyer-summary'
 
 const INCOMPLETE_QUOTE_STATUSES = new Set(['Iniciando', 'Cotizando', 'Recopilando'])
 
@@ -194,20 +195,8 @@ function normalizeCommission(row) {
 function normalizeMoneyfyer(item) {
   const selectedAccount = normalizePaymentAccount(item.activeAccount)
   const quoteCount = normalizeAmount(item.realizedCommissions)
-  const pendingPaymentAmount = normalizeAmount(item.pendingPayments)
-  const paidAmount = normalizeAmount(item.paidCommissions)
-  const totalGeneratedAmount = normalizeAmount(item.totalCommissions)
   const accountDataAvailable = Boolean(selectedAccount)
-
-  let statusLabel = 'Sin comisiones aprobadas'
-
-  if (pendingPaymentAmount > 0 && !accountDataAvailable) {
-    statusLabel = 'Falta cuenta bancaria'
-  } else if (pendingPaymentAmount > 0) {
-    statusLabel = 'Listo para nómina'
-  } else if (paidAmount > 0) {
-    statusLabel = 'Pagado'
-  }
+  const amounts = moneyfyerAmounts(item, accountDataAvailable)
 
   return {
     userId: item.idUser || '',
@@ -215,11 +204,8 @@ function normalizeMoneyfyer(item) {
     email: normalizeOptionalValue(item.userEmail) || '',
     selectedAccount,
     quoteCount,
-    pendingPaymentAmount,
-    paidAmount,
-    totalGeneratedAmount,
+    ...amounts,
     accountDataAvailable,
-    statusLabel,
     ownCommissions: normalizeAmount(item.ownCommissions),
     referredCommissions: normalizeAmount(item.referredCommissions),
   }

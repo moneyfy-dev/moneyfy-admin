@@ -12,14 +12,21 @@ const wait = (milliseconds = 250) =>
   new Promise((resolve) => window.setTimeout(resolve, milliseconds))
 
 export const mockDashboardRepository = {
-  async getSummary() {
+  async getSummary(period = {}) {
+    if (period.dateFrom || period.dateTo) throw new Error('El filtro por período requiere datos reales. Desactiva los mocks para consultar el backend.')
     await wait()
 
     return {
       activeUsers: 93,
       paidCommissions: 50071,
       pendingCommissions: 114320,
+      pendingApprovalCommissions: 0,
+      conflictCommissions: 0,
+      dateFrom: null,
+      dateTo: null,
       weeklyMetrics: structuredClone(mockWeeklyMetrics),
     }
   },
+  async getCommissions() { throw new Error('El detalle real de comisiones no está disponible en modo demo. Desactiva los mocks para consultar el backend.') },
+  async getReconciliation() { throw new Error('La conciliación real no está disponible en modo demo. Desactiva los mocks para consultar el backend.') },
 }
