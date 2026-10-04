@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/dashboard-ledger.test.mjs",
+    "test": "node --test tests/dashboard-ledger.test.mjs tests/insurer-export.test.mjs",
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0"

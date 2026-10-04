@@ -1,15 +1,58 @@
-import {
-  BACKEND_UPDATE_STATUSES,
-  COMMISSION_COLUMNS,
-} from '../constants'
+import { BACKEND_UPDATE_STATUSES } from '../constants.js'
+import { validatePendingQuotesExport } from '../api/pending-quotes-contract.js'
 
 const CATALOG_SHEET = 'Catalogos'
 const REQUIRED_HEADERS = ['idcotizacion', 'estado']
 const EDITABLE_STATUS_HEADER = 'estado'
+const BASE_EXPORT_COLUMNS = Object.freeze([
+  ['fecha', 'Fecha cotizacion'],
+  ['estadoActual', 'Estado actual'],
+  ['compania', 'Aseguradora'],
+  ['idCotizacion', 'ID cotizacion'],
+  ['planId', 'ID plan'],
+  ['nombrePlan', 'Nombre plan'],
+  ['patente', 'Patente'],
+  ['marcaVehiculo', 'Marca'],
+  ['modeloVehiculo', 'Modelo'],
+  ['anioVehiculo', 'Ano'],
+  ['rutDueno', 'RUT dueno'],
+  ['nombreDueno', 'Nombre dueno'],
+  ['rutComprador', 'RUT comprador'],
+  ['nombreComprador', 'Nombre comprador'],
+  ['emailComprador', 'Email comprador'],
+  ['telefonoComprador', 'Telefono comprador'],
+  ['region', 'Region'],
+  ['comuna', 'Comuna'],
+  ['calle', 'Calle'],
+  ['numeroDireccion', 'Numero'],
+  ['direccionCompleta', 'Direccion completa'],
+])
 const INSURER_BUCKETS = Object.freeze([
-  { key: 'BCI', sheetName: 'BCI' },
-  { key: 'FDI', sheetName: 'FDI' },
-  { key: 'OTRAS', sheetName: 'Otras companias' },
+  {
+    key: 'BCI',
+    sheetName: 'BCI',
+    extraColumns: [
+      ['intNroTarificacionBCI', 'Nro tarificacion BCI'],
+      ['strNroCotizacionBCI', 'Nro cotizacion BCI'],
+      ['dtFinVigenciaBCI', 'Fin vigencia BCI'],
+    ],
+  },
+  {
+    key: 'FDI',
+    sheetName: 'FDI',
+    extraColumns: [
+      ['dealTokenFDI', 'Deal token FDI'],
+      ['itemIdFDI', 'Item ID FDI'],
+      ['quotationIdFDI', 'Quotation ID FDI'],
+      ['fidIdFDI', 'FID ID FDI'],
+      ['expiryDateFDI', 'Expiry date FDI'],
+    ],
+  },
+  {
+    key: 'OTRAS',
+    sheetName: 'Otras companias',
+    extraColumns: [],
+  },
 ])
 
 async function createWorkbook() {
@@ -60,45 +103,38 @@ function styleHeader(row) {
 }
 
 function getColumnWidth(key) {
-  if (['idCotizacion', 'transactionId'].includes(key)) return 30
-  if (['beneficiario', 'nombreDueno', 'nombreComprador', 'nombrePlan', 'userEmail', 'emailComprador'].includes(key)) {
-    return 28
+  if (['idCotizacion', 'planId', 'dealTokenFDI', 'fidIdFDI'].includes(key)) return 24
+  if (['nombrePlan', 'nombreDueno', 'nombreComprador', 'direccionCompleta'].includes(key)) return 30
+  if (['emailComprador'].includes(key)) return 28
+  if (['calle', 'region', 'comuna'].includes(key)) return 20
+  if (['rutDueno', 'rutComprador', 'patente', 'telefonoComprador'].includes(key)) return 18
+  if (
+    [
+      'fecha',
+      'estadoActual',
+      'anioVehiculo',
+      'dtFinVigenciaBCI',
+      'expiryDateFDI',
+      'estado',
+    ].includes(key)
+  ) {
+    return 16
   }
-  if (key === 'calle') return 24
-  if (key === 'compania') return 22
-  if (['telefonoComprador', 'rutDueno', 'rutComprador', 'patente'].includes(key)) return 18
-  if (['fecha', 'fechaAprobacion', 'fechaPago', 'anioVehiculo', 'tipoVehiculo', 'estadoActual'].includes(key)) return 16
-  if (key === 'estado') return 18
-  return 20
+
+  return 18
 }
 
-function normalizeInsurerBucket(compania) {
-  const normalized = String(compania || '')
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-
-  if (normalized.includes('bci')) return 'BCI'
-  if (normalized.includes('fdi')) return 'FDI'
-  return 'OTRAS'
-}
-
-function getPendingCommissions(commissions) {
-  return commissions.filter((commission) => commission.estadoBackend === 'Pendiente')
-}
-
-function buildExportColumns() {
+function buildExportColumns(extraColumns = []) {
   return [
-    ...COMMISSION_COLUMNS.map(([key, label]) => ({ key, header: label, width: getColumnWidth(key) })),
+    ...BASE_EXPORT_COLUMNS.map(([key, header]) => ({ key, header, width: getColumnWidth(key) })),
+    ...extraColumns.map(([key, header]) => ({ key, header, width: getColumnWidth(key) })),
     { key: 'estado', header: EDITABLE_STATUS_HEADER, width: getColumnWidth('estado') },
   ]
 }
 
-function buildCommissionExportRow(commission) {
-  const baseRow = Object.fromEntries(
-    COMMISSION_COLUMNS.map(([key]) => [key, commission[key] ?? '']),
-  )
+function buildCommissionExportRow(commission, extraColumns = []) {
+  const keys = [...BASE_EXPORT_COLUMNS, ...extraColumns].map(([key]) => key)
+  const baseRow = Object.fromEntries(keys.map((key) => [key, commission[key] ?? '']))
 
   return {
     ...baseRow,
@@ -106,15 +142,15 @@ function buildCommissionExportRow(commission) {
   }
 }
 
-function addInsurerSheet(workbook, sheetName, commissions) {
-  const worksheet = workbook.addWorksheet(sheetName, {
+function addInsurerSheet(workbook, config, commissions) {
+  const worksheet = workbook.addWorksheet(config.sheetName, {
     views: [{ state: 'frozen', ySplit: 1 }],
   })
 
-  worksheet.columns = buildExportColumns()
+  worksheet.columns = buildExportColumns(config.extraColumns)
 
   commissions.forEach((commission) => {
-    worksheet.addRow(buildCommissionExportRow(commission))
+    worksheet.addRow(buildCommissionExportRow(commission, config.extraColumns))
   })
 
   styleHeader(worksheet.getRow(1))
@@ -122,7 +158,6 @@ function addInsurerSheet(workbook, sheetName, commissions) {
     from: { row: 1, column: 1 },
     to: { row: Math.max(worksheet.rowCount, 1), column: worksheet.columns.length },
   }
-  worksheet.getColumn('totalComision').numFmt = '$#,##0'
 
   worksheet.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return
@@ -179,33 +214,57 @@ function getSheetOrder(sheetName) {
   return index >= 0 ? index : INSURER_BUCKETS.length
 }
 
-export async function exportCommissionsExcel(commissions) {
-  const pendingCommissions = getPendingCommissions(commissions)
+function getGroupsCollection(source) {
+  if (Array.isArray(source)) return source
+  if (Array.isArray(source?.groups)) return source.groups
+  return []
+}
 
-  if (pendingCommissions.length === 0) {
-    throw new Error('No hay cotizaciones pendientes visibles para exportar a las aseguradoras.')
+function getSheetRows(groups, bucketKey) {
+  return groups
+    .filter((group) => group.insurerBucket === bucketKey)
+    .flatMap((group) => (Array.isArray(group.items) ? group.items : []))
+    .sort((first, second) => {
+      const companyComparison = String(first.compania || '').localeCompare(String(second.compania || ''), 'es')
+      if (companyComparison !== 0) return companyComparison
+
+      const dateComparison = String(first.fecha || '').localeCompare(String(second.fecha || ''), 'es')
+      if (dateComparison !== 0) return dateComparison
+
+      return String(first.idCotizacion || '').localeCompare(String(second.idCotizacion || ''), 'es')
+    })
+}
+
+export async function buildCommissionsExcelBuffer(pendingQuotesExport) {
+  validatePendingQuotesExport(pendingQuotesExport)
+  const groups = getGroupsCollection(pendingQuotesExport)
+
+  if (groups.length === 0) {
+    throw new Error('No hay cotizaciones pendientes para exportar a las aseguradoras.')
   }
 
   const workbook = await createWorkbook()
   workbook.creator = 'Moneyfy Admin'
   workbook.created = new Date()
 
-  INSURER_BUCKETS.forEach(({ key, sheetName }) => {
-    const filtered = pendingCommissions.filter(
-      (commission) => normalizeInsurerBucket(commission.compania) === key,
-    )
+  INSURER_BUCKETS.forEach((config) => {
+    const rows = getSheetRows(groups, config.key)
 
-    if (filtered.length === 0) {
+    if (rows.length === 0) {
       return
     }
 
-    addInsurerSheet(workbook, sheetName, filtered)
+    addInsurerSheet(workbook, config, rows)
   })
 
   addCatalogSheet(workbook)
   workbook.views = [{ activeTab: 0 }]
 
-  const buffer = await workbook.xlsx.writeBuffer()
+  return workbook.xlsx.writeBuffer()
+}
+
+export async function exportCommissionsExcel(pendingQuotesExport) {
+  const buffer = await buildCommissionsExcelBuffer(pendingQuotesExport)
   const blob = new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   })
@@ -227,7 +286,9 @@ export async function parseCommissionStatusExcel(file) {
   const seenIds = new Set()
   let processedRows = 0
 
-  INSURER_BUCKETS.forEach(({ sheetName }) => {
+  const unknownSheets = workbook.worksheets.filter(sheet => sheet.name !== CATALOG_SHEET && !INSURER_BUCKETS.some(config => config.sheetName === sheet.name))
+  if (unknownSheets.length) throw new Error('El archivo contiene hojas desconocidas. Usa el Excel exportado y edita solo la columna estado.')
+  INSURER_BUCKETS.forEach(({ sheetName, key: insurerBucket }) => {
     const worksheet = workbook.getWorksheet(sheetName)
     if (!worksheet) {
       return
@@ -245,22 +306,24 @@ export async function parseCommissionStatusExcel(file) {
         (status) => status.toLowerCase() === requestedStatus.toLowerCase(),
       )
 
-      if (!idCotizacion && !requestedStatus) continue
-      processedRows += 1
+      const hasData = row.values.some(value => value !== null && value !== undefined && String(value).trim())
+      if (!hasData) continue
 
       const rowReference = `${sheetName}:${rowNumber}`
       const rowOrder = getSheetOrder(sheetName) * 100000 + rowNumber
 
-      if (!idCotizacion || !estado) {
+      if (!idCotizacion) {
+        processedRows++
         rejected.push({
           rowNumber: rowReference,
           rowOrder,
-          reason: 'ID o estado no valido.',
+          reason: 'Falta ID de cotización.',
         })
         continue
       }
 
       if (seenIds.has(idCotizacion)) {
+        processedRows++
         rejected.push({
           rowNumber: rowReference,
           rowOrder,
@@ -270,7 +333,10 @@ export async function parseCommissionStatusExcel(file) {
       }
 
       seenIds.add(idCotizacion)
-      valid.push({ rowNumber: rowReference, rowOrder, idCotizacion, estado })
+      if (!requestedStatus) continue // Blank status means unchanged; the exported file starts blank.
+      processedRows++
+      if (!estado) { rejected.push({ rowNumber: rowReference, rowOrder, reason: 'Estado no válido: solo Aprobado, Rechazado o Caducado.' }); continue }
+      valid.push({ rowNumber: rowReference, rowOrder, idCotizacion, estado, insurerBucket })
     }
   })
 

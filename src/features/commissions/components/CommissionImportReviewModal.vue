@@ -52,7 +52,7 @@ onBeforeUnmount(() => {
             </span>
             <div class="min-w-0">
               <p class="text-xs font-semibold uppercase text-moneyfy-500">Revision previa</p>
-              <h2 id="commission-import-review-title" class="truncate text-lg font-bold">
+              <h2 id="commission-import-review-title" class="text-lg font-bold">
                 Confirmar actualizacion masiva
               </h2>
             </div>
@@ -92,8 +92,8 @@ onBeforeUnmount(() => {
                 Mostrando {{ preparedPreview.length }} de {{ preview.prepared.length }}
               </p>
             </div>
-            <div class="overflow-hidden rounded-[8px] border border-slate-200">
-              <table class="min-w-full divide-y divide-slate-200 text-left text-xs">
+            <div class="overflow-x-auto rounded-[8px] border border-slate-200">
+              <table class="min-w-[640px] w-full divide-y divide-slate-200 text-left text-xs">
                 <thead class="bg-slate-50 text-slate-500">
                   <tr>
                     <th class="px-3 py-2 font-semibold">Fila</th>
@@ -125,7 +125,7 @@ onBeforeUnmount(() => {
                 Mostrando {{ rejectedPreview.length }} de {{ preview.rejected.length }}
               </p>
             </div>
-            <div class="overflow-hidden rounded-[8px] border border-red-100 bg-red-50">
+            <div class="overflow-x-auto rounded-[8px] border border-red-100 bg-red-50">
               <table class="min-w-full divide-y divide-red-100 text-left text-xs">
                 <thead class="bg-red-100/70 text-red-700">
                   <tr>

@@ -299,6 +299,97 @@ export const mockCommissionsRepository = {
     ]
   },
 
+  async getPendingQuotes() {
+    await wait()
+
+    return {
+      groups: [
+        {
+          insurerAlias: 'aseguradora4',
+          insurerBucket: 'BCI',
+          insurerName: 'BCI',
+          items: [
+            {
+              userId: 'mock-user-1',
+              nombre: 'Alejandro Osses',
+              userEmail: 'alejandro@moneyfy.test',
+              idCotizacion: 'Q-2026-1032',
+              fecha: '2026-04-12',
+              estadoActual: 'Pendiente',
+              estadoBackend: 'Pendiente',
+              compania: 'BCI',
+              insurerAlias: 'aseguradora4',
+              insurerBucket: 'BCI',
+              planId: 'PLAN-BCI-1032',
+              nombrePlan: 'Plan auto protegido',
+              patente: 'CTJZ47',
+              marcaVehiculo: 'Toyota',
+              modeloVehiculo: 'Yaris',
+              anioVehiculo: 2022,
+              rutDueno: '12.345.678-9',
+              nombreDueno: 'Alejandro Osses',
+              rutComprador: '12.345.678-9',
+              nombreComprador: 'Alejandro Osses',
+              emailComprador: 'alejandro@moneyfy.test',
+              telefonoComprador: '+56911111111',
+              region: 'Metropolitana',
+              comuna: 'Santiago',
+              calle: 'Alameda',
+              numeroDireccion: '123',
+              direccionCompleta: 'Alameda 123, Santiago, Metropolitana',
+              intNroTarificacionBCI: 123456,
+              strNroCotizacionBCI: 'BCI-1032',
+              dtFinVigenciaBCI: '2026-07-12',
+            },
+          ],
+        },
+        {
+          insurerAlias: 'aseguradora5',
+          insurerBucket: 'FDI',
+          insurerName: 'FDI',
+          items: [
+            {
+              userId: 'mock-user-5',
+              nombre: 'Rodrigo Vera',
+              userEmail: 'rodrigo@moneyfy.test',
+              idCotizacion: 'Q-2026-1028',
+              fecha: '2026-05-14',
+              estadoActual: 'Pendiente',
+              estadoBackend: 'Pendiente',
+              compania: 'FDI',
+              insurerAlias: 'aseguradora5',
+              insurerBucket: 'FDI',
+              planId: 'PLAN-FDI-1028',
+              nombrePlan: 'Deducible 8 UF',
+              patente: 'KJPD55',
+              marcaVehiculo: 'Kia',
+              modeloVehiculo: 'Rio 5',
+              anioVehiculo: 2021,
+              rutDueno: '10.222.333-4',
+              nombreDueno: 'Rodrigo Vera',
+              rutComprador: '10.222.333-4',
+              nombreComprador: 'Rodrigo Vera',
+              emailComprador: 'rodrigo@moneyfy.test',
+              telefonoComprador: '+56922222222',
+              region: 'Valparaiso',
+              comuna: 'Vina del Mar',
+              calle: 'Libertad',
+              numeroDireccion: '456',
+              direccionCompleta: 'Libertad 456, Vina del Mar, Valparaiso',
+              dealTokenFDI: 'deal-token-1028',
+              itemIdFDI: 45,
+              quotationIdFDI: 7812,
+              fidIdFDI: 'FID-1028',
+              expiryDateFDI: '2026-07-01',
+            },
+          ],
+        },
+      ],
+      errors: [],
+      total: 2,
+    }
+  },
+
   async payQuotes(payload) {
     await wait()
     return {
