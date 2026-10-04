@@ -6,17 +6,23 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const summary = ref(null)
   const loading = ref(false)
   const error = ref('')
+  const period = ref({})
+  let requestId = 0
 
-  async function fetchSummary() {
+  async function fetchSummary(nextPeriod = period.value) {
+    const request = ++requestId
     loading.value = true
     error.value = ''
 
     try {
-      summary.value = await dashboardRepository.getSummary()
+      const result = await dashboardRepository.getSummary(nextPeriod)
+      if (request !== requestId) return
+      summary.value = result
+      period.value = { dateFrom: result.dateFrom || '', dateTo: result.dateTo || '' }
     } catch (fetchError) {
-      error.value = fetchError.message || 'No fue posible cargar el dashboard.'
+      if (request === requestId) error.value = fetchError.message || 'No fue posible cargar el dashboard.'
     } finally {
-      loading.value = false
+      if (request === requestId) loading.value = false
     }
   }
 
@@ -24,6 +30,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     summary,
     loading,
     error,
+    period,
     fetchSummary,
   }
 })
