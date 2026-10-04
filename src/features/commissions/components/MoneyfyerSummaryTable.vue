@@ -8,6 +8,21 @@ const pageSize = ref(10)
 const currentPage = ref(1)
 const dialog = ref(null)
 const selectedId = ref(null)
+const explanationOpen = ref(false)
+const explanationPinned = ref(false)
+const explanationFocused = ref(false)
+function hideExplanation() {
+  explanationOpen.value = false
+  explanationPinned.value = false
+  explanationFocused.value = false
+}
+function toggleExplanation() {
+  explanationPinned.value = !explanationPinned.value
+  explanationOpen.value = explanationPinned.value
+}
+function leaveExplanation() {
+  if (!explanationPinned.value && !explanationFocused.value) explanationOpen.value = false
+}
 let previousOverflow = null
 const selectedItem = computed(() => props.items.find((item) => item.userId === selectedId.value))
 const totalPages = computed(() => Math.max(1, Math.ceil(props.items.length / pageSize.value)))
@@ -19,6 +34,7 @@ watch(totalPages, (pages) => { currentPage.value = Math.min(currentPage.value, p
 watch(selectedItem, (item) => { if (!item && dialog.value?.open) dialog.value.close() })
 
 async function openDetail(item) {
+  hideExplanation()
   selectedId.value = item.userId
   await nextTick()
   previousOverflow = document.body.style.overflow
@@ -27,6 +43,7 @@ async function openDetail(item) {
 }
 function closeDetail() { dialog.value?.close() }
 function afterClose() {
+  hideExplanation()
   selectedId.value = null
   if (previousOverflow !== null) document.body.style.overflow = previousOverflow
   previousOverflow = null
@@ -94,7 +111,18 @@ function statusClass(status) {
     <dialog ref="dialog" @keydown="trapFocus" aria-labelledby="moneyfyer-detail-title" class="moneyfyer-detail m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-3xl overflow-y-auto rounded-2xl bg-white p-0 text-ink shadow-2xl" @close="afterClose" @click="($event.target === dialog) && closeDetail()">
       <template v-if="selectedItem">
         <header class="flex items-start justify-between gap-4 bg-ink p-6 text-white">
-          <div class="min-w-0"><p class="text-xs font-semibold text-moneyfy-400">Detalle de Moneyfyer</p><h2 id="moneyfyer-detail-title" class="mt-1 break-words text-xl font-bold">{{ selectedItem.nombre }}</h2><p class="mt-2 break-all text-sm text-slate-300">{{ selectedItem.email || 'Correo no disponible' }}</p></div>
+          <div class="min-w-0 flex-1">
+            <div class="relative" @mouseenter="explanationOpen = true" @mouseleave="leaveExplanation" @keydown.esc.stop.prevent="hideExplanation">
+              <div class="flex items-center gap-2">
+                <p class="text-xs font-semibold text-moneyfy-400">Detalle de Moneyfyer</p>
+                <button type="button" aria-label="Cómo se calculan las comisiones" :aria-describedby="explanationOpen ? 'moneyfyer-calculation-tooltip' : undefined" :aria-expanded="explanationOpen" class="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-moneyfy-400 hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moneyfy-400" @focus="explanationFocused = true; explanationOpen = true" @blur="explanationFocused = false; leaveExplanation()" @click="toggleExplanation"><i class="ri-information-line text-lg" aria-hidden="true"></i></button>
+              </div>
+              <div v-if="explanationOpen" id="moneyfyer-calculation-tooltip" role="tooltip" class="absolute left-0 top-full z-10 max-h-[60dvh] w-full max-w-md overflow-y-auto rounded-xl border border-slate-200 bg-white p-4 text-xs font-normal leading-5 text-slate-700 shadow-xl">
+                Pend. pago incluye únicamente comisiones Aprobado. Los importes generados incluyen Aprobado, Pagado y Conflictivo; una comisión conflictiva corresponde a un pago fallido de una comisión aprobada. Por aprobar (Pendiente) y Conflictivas se muestran por separado. Cotizaciones cuenta las comisiones recibidas, incluidas las originadas por referidos. Este consolidado corresponde a todo el historial.
+              </div>
+            </div>
+            <h2 id="moneyfyer-detail-title" class="mt-1 break-words text-xl font-bold">{{ selectedItem.nombre }}</h2><p class="mt-2 break-all text-sm text-slate-300">{{ selectedItem.email || 'Correo no disponible' }}</p>
+          </div>
           <button type="button" autofocus aria-label="Cerrar detalle" class="rounded-full border border-white/30 px-3 py-2 hover:bg-white/10" @click="closeDetail">✕</button>
         </header>
         <div class="p-6">
@@ -108,7 +136,6 @@ function statusClass(status) {
             <div class="rounded-xl bg-amber-50 p-4"><dt class="text-sm text-slate-600">Por aprobar</dt><dd class="mt-2 text-xl font-bold text-amber-700">{{ formatCurrency(selectedItem.pendingApprovalAmount) }}</dd></div>
             <div class="rounded-xl bg-orange-50 p-4"><dt class="text-sm text-slate-600">Conflictivas</dt><dd class="mt-2 text-xl font-bold text-orange-700">{{ formatCurrency(selectedItem.conflictAmount) }}</dd></div>
           </dl>
-          <p class="mt-5 text-sm leading-6 text-slate-600">Pend. pago incluye únicamente comisiones Aprobado. Los importes generados incluyen Aprobado, Pagado y Conflictivo; una comisión conflictiva corresponde a un pago fallido de una comisión aprobada. Por aprobar (Pendiente) y Conflictivas se muestran por separado. Cotizaciones cuenta las comisiones recibidas, incluidas las originadas por referidos. Este consolidado corresponde a todo el historial.</p>
           <div class="mt-6 border-t border-slate-100 pt-4"><p class="break-words text-sm text-slate-700">{{ accountLabel(selectedItem) }}</p><p class="mt-1 text-sm text-slate-500">{{ selectedItem.selectedAccount?.holderName || 'Titular no disponible' }}</p></div>
           <div class="mt-6 flex justify-end"><button type="button" class="btn-primary" @click="closeDetail">Cerrar</button></div>
         </div>
