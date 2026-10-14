@@ -26,6 +26,7 @@ const BASE_EXPORT_COLUMNS = Object.freeze([
   ['calle', 'Calle'],
   ['numeroDireccion', 'Numero'],
   ['direccionCompleta', 'Direccion completa'],
+  ['observaciones', 'Observaciones'],
 ])
 const INSURER_BUCKETS = Object.freeze([
   {

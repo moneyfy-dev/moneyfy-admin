@@ -8,6 +8,66 @@ const quote = (id, insurer = 'BCI') => ({ userId: 'owner-' + id, userFullName: '
 const response = (rows = [quote('quote-1')], errors = []) => ({ quotations: [{ insurerAlias: 'aseguradora4', insurerQuotations: rows }], errors })
 const fileOf = buffer => ({ arrayBuffer: async () => buffer })
 
+test('legacy mixed group exports every pending row to the correct insurer or explicit review sheet', async () => {
+  // Anonymized shape of the reported endpoint: 11 blank aliases, 1 FDI and 2 BCI.
+  const legacyNames = ['Seguros Alameda', 'Los Alamos Seguros Automotriz', 'BCI', 'FDI', 'Tractor Seguros Automotriz', 'BCI', 'Tractor Seguros Automotriz', 'BCI', 'FDI', 'BCI', 'BCI']
+  const payload = { quotations: [
+    { insurerAlias: '', insurerQuotations: legacyNames.map((name, i) => ({ ...quote('legacy-' + i), insurer: name, intNroTarificacionBCI: undefined, strNroCotizacionBCI: undefined, dtFinVigenciaBCI: undefined })) },
+    { insurerAlias: 'aseguradora5', insurerQuotations: [{ ...quote('current-fdi', 'FDI'), itemIdFDI: 0 }] },
+    { insurerAlias: 'aseguradora4', insurerQuotations: [quote('current-bci-one'), quote('current-bci-two')] },
+  ], errors: [] }
+  const catalog = normalizePendingQuotesResponse(payload)
+  assert.equal(catalog.total, 14)
+  const workbook = new ExcelJS.Workbook()
+  await workbook.xlsx.load(await buildCommissionsExcelBuffer(catalog))
+  for (const [sheetName, count] of [['BCI', 7], ['FDI', 3], ['Otras companias', 4]]) assert.equal(workbook.getWorksheet(sheetName).rowCount - 1, count)
+  const bci = workbook.getWorksheet('BCI')
+  const notes = bci.getRow(2).getCell(bci.getRow(1).values.indexOf('Observaciones')).value
+  assert.match(notes, /Alias ausente/)
+  const approved = { valid: [{ idCotizacion: 'legacy-7', estado: 'Aprobado', insurerBucket: 'BCI' }], rejected: [], total: 1 }
+  assert.equal(buildStatusImportPreview(approved, catalog).prepared.length, 1)
+  for (const bucket of ['OTRAS', 'BCI']) {
+    assert.throws(() => buildStatusImportPreview({ valid: [{ idCotizacion: 'legacy-0', estado: 'Aprobado', insurerBucket: bucket }], rejected: [], total: 1 }, catalog), /requiere revisión/)
+  }
+})
+
+test('a missing alias never guesses insurer from a substring and a nameless row blocks export', () => {
+  const catalog = normalizePendingQuotesResponse({ quotations: [{ insurerAlias: '', insurerQuotations: [{ ...quote('review'), insurer: 'Empresa BCI desconocida' }] }], errors: [] })
+  assert.equal(catalog.groups[0].insurerBucket, 'OTRAS')
+  assert.throws(() => normalizePendingQuotesResponse({ quotations: [{ insurerAlias: '', insurerQuotations: [{ ...quote('no-insurer'), insurer: '' }] }], errors: [] }), /falta nombre/)
+})
+
+test('FDI zero-based provider references are preserved as zero in the insurer workbook', async () => {
+  const payload = { quotations: [{ insurerAlias: 'aseguradora5', insurerQuotations: [{ ...quote('fdi-zero', 'FDI'), itemIdFDI: 0, quotationIdFDI: '0' }] }], errors: [] }
+  const catalog = normalizePendingQuotesResponse(payload)
+  assert.equal(catalog.groups[0].items[0].itemIdFDI, 0)
+  assert.equal(catalog.groups[0].items[0].quotationIdFDI, 0)
+  const workbook = new ExcelJS.Workbook()
+  await workbook.xlsx.load(await buildCommissionsExcelBuffer(catalog))
+  const sheet = workbook.getWorksheet('FDI')
+  for (const header of ['Item ID FDI', 'Quotation ID FDI']) assert.equal(sheet.getRow(2).getCell(sheet.getRow(1).values.indexOf(header)).value, 0)
+})
+
+test('FDI accepts zero but rejects malformed, negative, fractional and unsafe provider references', () => {
+  for (const field of ['itemIdFDI', 'quotationIdFDI']) {
+    for (const value of [-1, 0.5, Number.MAX_SAFE_INTEGER + 1, true, '', 'invalid']) {
+      const payload = { quotations: [{ insurerAlias: 'aseguradora5', insurerQuotations: [{ ...quote('fdi-invalid', 'FDI'), [field]: value }] }], errors: [] }
+      assert.throws(() => normalizePendingQuotesResponse(payload), /referencia numérica/)
+    }
+  }
+  assert.throws(() => normalizePendingQuotesResponse(response([{ ...quote('bci-invalid'), intNroTarificacionBCI: 0 }])), /referencia numérica/)
+})
+
+test('an unrecognized insurer identifies every affected quote and still blocks the full report', () => {
+  const payload = { quotations: [{ insurerAlias: 'unknown', insurerQuotations: [quote('unknown-one'), quote('unknown-two')] }, { insurerAlias: 'aseguradora4', insurerQuotations: [quote('valid-bci')] }], errors: [] }
+  assert.throws(() => normalizePendingQuotesResponse(payload), error => {
+    assert.deepEqual(error.issues.map(issue => issue.id), ['unknown-one', 'unknown-two'])
+    assert.match(error.message, /unknown-one/)
+    assert.match(error.message, /unknown-two/)
+    return true
+  })
+})
+
 test('global pending endpoint exports more than 50 rows across dates without page or screen filters', async () => {
   const calls = []
   const rows = Array.from({ length: 57 }, (_, i) => quote('quote-' + i))

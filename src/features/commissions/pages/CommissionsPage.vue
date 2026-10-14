@@ -19,6 +19,7 @@ const commissionsStore = useCommissionsStore()
 const fileInput = ref(null)
 const paymentFileInput = ref(null)
 const fileError = ref('')
+const exportNotice = ref('')
 const isExporting = ref(false)
 const isImporting = ref(false)
 
@@ -42,11 +43,14 @@ async function exportRows() {
   if (isExporting.value || isImporting.value) return
   isExporting.value = true
   fileError.value = ''
+  exportNotice.value = ''
   commissionsStore.clearAlerts()
 
   try {
     const pendingQuotes = await commissionsStore.fetchPendingQuotesExport()
     await exportCommissionsExcel(pendingQuotes)
+    const reviewCount = pendingQuotes.groups.flatMap(group => group.items).filter(row => row.observaciones).length
+    if (reviewCount) exportNotice.value = `Excel generado con todas las ${pendingQuotes.total} cotizaciones. ${reviewCount} requieren revisión: consulta la columna Observaciones. La hoja Otras companias es solo de revisión y no permite actualizar estados.`
   } catch (error) {
     fileError.value = error.message || 'No fue posible generar el archivo Excel.'
   } finally {
@@ -233,6 +237,7 @@ async function importPaymentFile(event) {
               La nómina fue revisada, pero la operación no se procesó.
             </template>
           </p>
+          <p v-if="exportNotice" role="status" class="rounded-[8px] bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">{{ exportNotice }}</p>
           <p
             v-if="fileError"
             class="rounded-[8px] bg-red-50 px-3 py-2 text-xs font-medium text-red-700"

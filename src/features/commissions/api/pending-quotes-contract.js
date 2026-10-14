@@ -1,9 +1,10 @@
 import { BACKEND_UPDATE_STATUSES } from '../constants.js'
 
 const INSURERS = { aseguradora4: 'BCI', aseguradora5: 'FDI' }
+const LEGACY_INSURER_NAMES = { bci: 'aseguradora4', fdi: 'aseguradora5' }
 const text = value => value === null || value === undefined || ['N/A', 'null', 'undefined'].includes(String(value).trim()) ? null : String(value).trim() || null
 const reference = value => (text(value) || 'sin ID').replace(/[^\p{L}\p{N}_: .-]/gu, '').slice(0, 80)
-const validNumberId = value => value !== null && value !== undefined && value !== '' && Number.isSafeInteger(Number(value)) && Number(value) > 0
+const validNumberId = (value, minimum = 1) => value !== null && value !== undefined && value !== '' && Number.isSafeInteger(Number(value)) && Number(value) >= minimum
 const providerNumber = value => value == null ? null : (typeof value === 'number' || (typeof value === 'string' && /^\d+$/.test(value.trim()))) ? Number(value) : NaN
 export function safeStatusMutationError(error) {
   return Object.assign(new Error('No fue posible confirmar las actualizaciones. Revisa el estado de las cotizaciones antes de reenviar.'), { status: error.status, code: error.code })
@@ -53,8 +54,11 @@ export function validatePendingQuotesExport(data) {
   let total = 0
   for (const group of data.groups) {
     if (!Array.isArray(group?.items)) { issues.push(problem(null, 'grupo de aseguradora incompleto')); continue }
-    const expected = INSURERS[text(group.insurerAlias)?.toLowerCase()]
-    if (!expected || expected !== group.insurerBucket) issues.push(problem(group.insurerAlias, 'aseguradora o alias no compatible; no se omitieron sus filas'))
+    const expected = INSURERS[text(group.insurerAlias)?.toLowerCase()] || (group.insurerAlias === null && group.insurerBucket === 'OTRAS' ? 'OTRAS' : undefined)
+    if (!expected || expected !== group.insurerBucket) {
+      const affected = group.items.length ? group.items : [null]
+      for (const row of affected) issues.push(problem(row?.idCotizacion || group.insurerAlias, 'aseguradora o alias no compatible; revisa el plan y la aseguradora de esta cotización; no se omitieron sus filas'))
+    }
     for (const row of group.items) {
       total++
       const id = text(row?.idCotizacion)
@@ -64,9 +68,12 @@ export function validatePendingQuotesExport(data) {
       if (!text(row.userId)) issues.push(problem(id, 'falta usuario propietario de la cotización'))
       if (row.estadoBackend !== 'Pendiente') issues.push(problem(id, 'la cotización no tiene estado Pendiente'))
       if (!text(row.planId)) issues.push(problem(id, 'falta ID del plan seleccionado'))
+      if (expected === 'OTRAS' && !text(row.compania)) issues.push(problem(id, 'falta nombre de aseguradora para revisión'))
       if (row.insurerAlias !== group.insurerAlias || row.insurerBucket !== expected) issues.push(problem(id, 'aseguradora inconsistente entre grupo y cotización'))
       const providerNumbers = expected === 'BCI' ? ['intNroTarificacionBCI'] : expected === 'FDI' ? ['itemIdFDI', 'quotationIdFDI'] : []
-      for (const field of providerNumbers) if (row[field] !== null && row[field] !== undefined && !validNumberId(row[field])) issues.push(problem(id, `referencia numérica de aseguradora no válida (${field})`))
+      // FDI uses zero-based item and quotation references (see its quote response contract).
+      const minimumProviderId = expected === 'FDI' ? 0 : 1
+      for (const field of providerNumbers) if (row[field] !== null && row[field] !== undefined && !validNumberId(row[field], minimumProviderId)) issues.push(problem(id, `referencia numérica de aseguradora no válida (${field})`))
     }
   }
   if (!Number.isInteger(data.total) || data.total !== total) issues.push(problem(null, 'cantidad de pendientes inconsistente'))
@@ -88,19 +95,26 @@ function normalizeRow(item, insurerAlias, insurerBucket) {
 }
 export function normalizePendingQuotesResponse(data) {
   if (!data || !Array.isArray(data.quotations) || !Array.isArray(data.errors)) throw new PendingQuotesDataError([problem(null, 'respuesta de pendientes no válida')])
-  const groups = data.quotations.map(group => {
+  const grouped = new Map()
+  for (const group of data.quotations) {
     if (!group || !Array.isArray(group.insurerQuotations)) throw new PendingQuotesDataError([problem(group?.insurerAlias, 'grupo de cotizaciones no válido')])
-    const insurerAlias = text(group.insurerAlias)?.toLowerCase()
-    const insurerBucket = INSURERS[insurerAlias]
-    const items = group.insurerQuotations.map(item => {
+    const sourceAlias = text(group.insurerAlias)?.toLowerCase() || null
+    for (const item of group.insurerQuotations) {
       if (!item || typeof item !== 'object') throw new PendingQuotesDataError([problem(null, 'fila de cotización no válida')])
       for (const field of ['quotationId', 'userId', 'planId']) if (typeof item[field] !== 'string' || !text(item[field])) throw new PendingQuotesDataError([problem(item.quotationId, `identidad de cotización no válida (${field})`)])
       const insurerName = text(item.insurer)?.toLowerCase() || ''
+      const insurerAlias = sourceAlias || LEGACY_INSURER_NAMES[insurerName] || null
+      const insurerBucket = INSURERS[insurerAlias] || (sourceAlias === null ? 'OTRAS' : undefined)
       if ((insurerBucket === 'BCI' && /fdi|fid/.test(insurerName)) || (insurerBucket === 'FDI' && /bci/.test(insurerName))) throw new PendingQuotesDataError([problem(item.quotationId, 'el nombre de aseguradora no coincide con su alias')])
-      return normalizeRow(item, insurerAlias, insurerBucket)
-    })
-    return { insurerAlias, insurerBucket, insurerName: items.find(row => row.compania)?.compania || null, items }
-  })
+      const row = normalizeRow(item, insurerAlias, insurerBucket)
+      row.observaciones = insurerBucket === 'OTRAS'
+        ? 'Aseguradora sin integración identificada. Solo revisión; no permite cargar estados desde esta hoja.'
+        : !sourceAlias ? 'Alias ausente en origen; agrupación por nombre exacto de aseguradora. Verificar referencias externas antes de enviar.' : ''
+      if (!grouped.has(insurerAlias)) grouped.set(insurerAlias, { insurerAlias, insurerBucket, insurerName: row.compania, items: [] })
+      grouped.get(insurerAlias).items.push(row)
+    }
+  }
+  const groups = [...grouped.values()]
   return validatePendingQuotesExport({ groups, errors: data.errors, total: groups.reduce((sum, group) => sum + group.items.length, 0) })
 }
 export function createPendingQuotesRepository(client) {
@@ -129,6 +143,7 @@ export function buildStatusImportPreview(imported, pendingQuotes) {
     seen.add(id)
     if (!BACKEND_UPDATE_STATUSES.includes(row.estado)) issues.push(problem(id, 'solo se permiten Aprobado, Rechazado y Caducado'))
     if (!quote) { issues.push(problem(id, 'no está disponible en el catálogo global de pendientes')); continue }
+    if (quote.insurerBucket === 'OTRAS') { issues.push(problem(id, 'la aseguradora requiere revisión; no se pueden actualizar sus estados desde el Excel')); continue }
     if (row.insurerBucket && row.insurerBucket !== quote.insurerBucket) issues.push(problem(id, 'la hoja no coincide con la aseguradora de la cotización'))
     prepared.push({ ...row, userId: quote.userId, nombre: quote.nombre, compania: quote.compania, estadoActual: quote.estadoActual })
   }
