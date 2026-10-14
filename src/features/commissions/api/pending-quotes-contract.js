@@ -3,7 +3,7 @@ import { BACKEND_UPDATE_STATUSES } from '../constants.js'
 const INSURERS = { aseguradora4: 'BCI', aseguradora5: 'FDI' }
 const text = value => value === null || value === undefined || ['N/A', 'null', 'undefined'].includes(String(value).trim()) ? null : String(value).trim() || null
 const reference = value => (text(value) || 'sin ID').replace(/[^\p{L}\p{N}_: .-]/gu, '').slice(0, 80)
-const validNumberId = value => value !== null && value !== undefined && value !== '' && Number.isSafeInteger(Number(value)) && Number(value) > 0
+const validNumberId = (value, minimum = 1) => value !== null && value !== undefined && value !== '' && Number.isSafeInteger(Number(value)) && Number(value) >= minimum
 const providerNumber = value => value == null ? null : (typeof value === 'number' || (typeof value === 'string' && /^\d+$/.test(value.trim()))) ? Number(value) : NaN
 export function safeStatusMutationError(error) {
   return Object.assign(new Error('No fue posible confirmar las actualizaciones. Revisa el estado de las cotizaciones antes de reenviar.'), { status: error.status, code: error.code })
@@ -54,7 +54,10 @@ export function validatePendingQuotesExport(data) {
   for (const group of data.groups) {
     if (!Array.isArray(group?.items)) { issues.push(problem(null, 'grupo de aseguradora incompleto')); continue }
     const expected = INSURERS[text(group.insurerAlias)?.toLowerCase()]
-    if (!expected || expected !== group.insurerBucket) issues.push(problem(group.insurerAlias, 'aseguradora o alias no compatible; no se omitieron sus filas'))
+    if (!expected || expected !== group.insurerBucket) {
+      const affected = group.items.length ? group.items : [null]
+      for (const row of affected) issues.push(problem(row?.idCotizacion || group.insurerAlias, 'aseguradora o alias no compatible; revisa el plan y la aseguradora de esta cotización; no se omitieron sus filas'))
+    }
     for (const row of group.items) {
       total++
       const id = text(row?.idCotizacion)
@@ -66,7 +69,9 @@ export function validatePendingQuotesExport(data) {
       if (!text(row.planId)) issues.push(problem(id, 'falta ID del plan seleccionado'))
       if (row.insurerAlias !== group.insurerAlias || row.insurerBucket !== expected) issues.push(problem(id, 'aseguradora inconsistente entre grupo y cotización'))
       const providerNumbers = expected === 'BCI' ? ['intNroTarificacionBCI'] : expected === 'FDI' ? ['itemIdFDI', 'quotationIdFDI'] : []
-      for (const field of providerNumbers) if (row[field] !== null && row[field] !== undefined && !validNumberId(row[field])) issues.push(problem(id, `referencia numérica de aseguradora no válida (${field})`))
+      // FDI uses zero-based item and quotation references (see its quote response contract).
+      const minimumProviderId = expected === 'FDI' ? 0 : 1
+      for (const field of providerNumbers) if (row[field] !== null && row[field] !== undefined && !validNumberId(row[field], minimumProviderId)) issues.push(problem(id, `referencia numérica de aseguradora no válida (${field})`))
     }
   }
   if (!Number.isInteger(data.total) || data.total !== total) issues.push(problem(null, 'cantidad de pendientes inconsistente'))

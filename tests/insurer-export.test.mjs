@@ -8,6 +8,37 @@ const quote = (id, insurer = 'BCI') => ({ userId: 'owner-' + id, userFullName: '
 const response = (rows = [quote('quote-1')], errors = []) => ({ quotations: [{ insurerAlias: 'aseguradora4', insurerQuotations: rows }], errors })
 const fileOf = buffer => ({ arrayBuffer: async () => buffer })
 
+test('FDI zero-based provider references are preserved as zero in the insurer workbook', async () => {
+  const payload = { quotations: [{ insurerAlias: 'aseguradora5', insurerQuotations: [{ ...quote('fdi-zero', 'FDI'), itemIdFDI: 0, quotationIdFDI: '0' }] }], errors: [] }
+  const catalog = normalizePendingQuotesResponse(payload)
+  assert.equal(catalog.groups[0].items[0].itemIdFDI, 0)
+  assert.equal(catalog.groups[0].items[0].quotationIdFDI, 0)
+  const workbook = new ExcelJS.Workbook()
+  await workbook.xlsx.load(await buildCommissionsExcelBuffer(catalog))
+  const sheet = workbook.getWorksheet('FDI')
+  for (const header of ['Item ID FDI', 'Quotation ID FDI']) assert.equal(sheet.getRow(2).getCell(sheet.getRow(1).values.indexOf(header)).value, 0)
+})
+
+test('FDI accepts zero but rejects malformed, negative, fractional and unsafe provider references', () => {
+  for (const field of ['itemIdFDI', 'quotationIdFDI']) {
+    for (const value of [-1, 0.5, Number.MAX_SAFE_INTEGER + 1, true, '', 'invalid']) {
+      const payload = { quotations: [{ insurerAlias: 'aseguradora5', insurerQuotations: [{ ...quote('fdi-invalid', 'FDI'), [field]: value }] }], errors: [] }
+      assert.throws(() => normalizePendingQuotesResponse(payload), /referencia numérica/)
+    }
+  }
+  assert.throws(() => normalizePendingQuotesResponse(response([{ ...quote('bci-invalid'), intNroTarificacionBCI: 0 }])), /referencia numérica/)
+})
+
+test('an unrecognized insurer identifies every affected quote and still blocks the full report', () => {
+  const payload = { quotations: [{ insurerAlias: 'N/A', insurerQuotations: [quote('unknown-one'), quote('unknown-two')] }, { insurerAlias: 'aseguradora4', insurerQuotations: [quote('valid-bci')] }], errors: [] }
+  assert.throws(() => normalizePendingQuotesResponse(payload), error => {
+    assert.deepEqual(error.issues.map(issue => issue.id), ['unknown-one', 'unknown-two'])
+    assert.match(error.message, /unknown-one/)
+    assert.match(error.message, /unknown-two/)
+    return true
+  })
+})
+
 test('global pending endpoint exports more than 50 rows across dates without page or screen filters', async () => {
   const calls = []
   const rows = Array.from({ length: 57 }, (_, i) => quote('quote-' + i))
